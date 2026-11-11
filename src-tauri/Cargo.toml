@@ -1,0 +1,29 @@
+[package]
+name = "scratch-pad"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+
+[lib]
+name = "scratch_pad_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+# Exact versions, tested together by the compiler's kit check. Tauri's internal crates are pinned too:
+# with caret versions Cargo mixes a newer tauri-runtime into tauri 2.11 and the build breaks.
+[build-dependencies]
+tauri-build = { version = "=2.6.3", features = [] }
+tauri-codegen = "=2.6.3"
+
+[dependencies]
+tauri = { version = "=2.11.5", features = [] }
+tauri-runtime = "=2.11.3"
+tauri-runtime-wry = "=2.11.4"
+tauri-utils = "=2.9.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rusqlite = { version = "=0.37.0", features = ["bundled"] }
+tauri-plugin-dialog = "=2.7.2"
+
+[dev-dependencies]
+tauri = { version = "=2.11.5", features = ["test"] }
+tempfile = "3"

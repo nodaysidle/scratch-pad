@@ -1,0 +1,824 @@
+{
+  "schema": "nodaysidle.cascade.packet.v4",
+  "compiler": {
+    "version": "4.0.0"
+  },
+  "preset": {
+    "id": "tauri2-rust-typescript-desktop",
+    "options": {
+      "linuxPackaging": "appimage",
+      "wayland": true
+    },
+    "capabilities": {
+      "windows": true,
+      "tray": true,
+      "background": true,
+      "notifications": true,
+      "documents": true,
+      "fileAccess": "dialog",
+      "microphone": true,
+      "camera": true,
+      "location": true,
+      "launchAtLogin": true,
+      "network": true,
+      "globalShortcuts": "app",
+      "clipboardWatch": false,
+      "accessibilityControl": false,
+      "surfaces": [
+        "main",
+        "item-page",
+        "about-page",
+        "not-found-page"
+      ]
+    }
+  },
+  "blueprint": {
+    "productName": "Scratch Pad",
+    "summary": "Scratch Pad is a single-note app: the user types into one text area, the text is saved automatically one second after typing stops, the text can be saved to a Markdown file the user chooses, a plain text file the user chooses can replace the text after confirmation, and the text is stored on the device and restored after restart.",
+    "targetUsers": [
+      "People who want one always-available scratch note for quick jottings",
+      "Writers who keep a single running draft and occasionally export it as Markdown"
+    ],
+    "goals": [
+      "Provide one text area for a single note",
+      "Persist the note automatically one second after typing stops",
+      "Save the note to a user-chosen Markdown file",
+      "Replace the note from a user-chosen plain text file after confirmation",
+      "Restore the stored note after restart"
+    ],
+    "nonGoals": [
+      "Multiple notes or a note list",
+      "Rich text formatting or Markdown preview",
+      "Cloud sync or sharing"
+    ],
+    "features": [
+      {
+        "name": "Single note editor",
+        "userOutcome": "The user types freely in one text area and the note is kept on the device and restored after restart.",
+        "trigger": "The user types in the text area, or the app starts.",
+        "behavior": "The main window shows exactly one text area holding the single note. On app start the stored note is loaded into the text area; if no note has been stored yet the text area is empty. Every keystroke updates the in-memory text, and one second after the last keystroke the full text is written to the device store, replacing the previous stored text. If the user types again before the one-second delay elapses, the pending save is restarted so only the latest text is written. The text area accepts any text including empty text; saving empty text stores an empty note. If loading the stored note fails, the text area is shown empty and one error message states the note could not be loaded.",
+        "failureOutcome": "A failed automatic save leaves the previously stored note unchanged and one error message states the note could not be saved; the text stays in the text area so the next pause in typing retries the save.",
+        "failureRecovery": "retry",
+        "surface": "main",
+        "acceptanceSignals": [
+          "After typing text and advancing the injected clock by 1000 ms, reading the stored note returns exactly the typed text.",
+          "Typing more text 500 ms after a change and advancing the clock by 1000 ms stores only the latest text, not the intermediate text.",
+          "With a stored note present, starting the app shows that stored text in the text area.",
+          "When the store write fails, the previously stored note read back is unchanged and the error message is shown."
+        ],
+        "usesPlatformNeeds": [
+          "local-storage"
+        ],
+        "usesTray": false,
+        "clipboardAccess": "none",
+        "clipboardWatch": false,
+        "usesData": [
+          "Note"
+        ],
+        "usesServices": [],
+        "userFileAccess": "none",
+        "choiceLists": [],
+        "buildsOn": [],
+        "dataOperations": [
+          {
+            "data": "Note",
+            "operations": [
+              "create",
+              "read",
+              "update"
+            ]
+          }
+        ],
+        "narrowsListBy": "none",
+        "invokedBy": "user-control",
+        "runsEverySeconds": null,
+        "runsDailyAt": null,
+        "systemSource": "none",
+        "showsCurrentTime": false,
+        "readsCurrentDay": false,
+        "refreshesEverySeconds": null,
+        "runsAtField": null,
+        "scheduledNotification": null
+      },
+      {
+        "name": "Save note as Markdown file",
+        "userOutcome": "The user saves the current note text to a Markdown file at a location the user chooses.",
+        "trigger": "The user activates the Save as Markdown control.",
+        "behavior": "Activating the control opens a Save panel where the user chooses the destination and file name; the suggested file name is scratch-pad.md. The file is written as Markdown with a level-one heading line '# Scratch Pad', one blank line, then the note text exactly as it appears in the text area, with no trailing newline added beyond the note text. The write replaces the whole file atomically so a failed write leaves any existing file at that location unchanged. On success a confirmation message states the file was saved. If the user cancels the Save panel nothing is written and no message is shown.",
+        "failureOutcome": "If the file cannot be written, the existing file at the chosen location is left unchanged and one error message states the file could not be saved.",
+        "failureRecovery": "retry",
+        "surface": "main",
+        "acceptanceSignals": [
+          "Saving a note whose text is 'Hello' produces a file whose content is '# Scratch Pad\\n\\nHello'.",
+          "Saving an empty note produces a file whose content is '# Scratch Pad\\n\\n'.",
+          "When the write fails, a pre-existing file at the chosen location still has its previous content.",
+          "Cancelling the Save panel writes no file and shows no message."
+        ],
+        "usesPlatformNeeds": [],
+        "usesTray": false,
+        "clipboardAccess": "none",
+        "clipboardWatch": false,
+        "usesData": [
+          "Note",
+          "Markdown export file"
+        ],
+        "usesServices": [],
+        "userFileAccess": "saves",
+        "choiceLists": [],
+        "buildsOn": [
+          "Single note editor"
+        ],
+        "dataOperations": [
+          {
+            "data": "Note",
+            "operations": [
+              "read"
+            ]
+          },
+          {
+            "data": "Markdown export file",
+            "operations": [
+              "create"
+            ]
+          }
+        ],
+        "narrowsListBy": "none",
+        "invokedBy": "user-control",
+        "runsEverySeconds": null,
+        "runsDailyAt": null,
+        "systemSource": "none",
+        "showsCurrentTime": false,
+        "readsCurrentDay": false,
+        "refreshesEverySeconds": null,
+        "runsAtField": null,
+        "scheduledNotification": null
+      },
+      {
+        "name": "Open plain text file to replace note",
+        "userOutcome": "The user replaces the note text with the contents of a plain text file the user chooses, after confirming.",
+        "trigger": "The user activates the Open text file control.",
+        "behavior": "Activating the control opens an Open panel where the user chooses a plain text file. After a file is chosen, a confirmation dialog asks 'Replace the current note with the contents of this file?' with the labels Replace and Cancel. Choosing Cancel leaves the note text unchanged and writes nothing. Choosing Replace reads the file as UTF-8 text, puts that text into the text area, and immediately stores it as the note, replacing the previous stored text. If the file cannot be read as UTF-8 text, the note text is left unchanged and one error message states the file could not be opened.",
+        "failureOutcome": "If the chosen file cannot be read, the note text and the stored note are left unchanged and one error message states the file could not be opened.",
+        "failureRecovery": "retry",
+        "surface": "main",
+        "acceptanceSignals": [
+          "Confirming Replace with a file containing 'Draft two' leaves the text area showing 'Draft two' and reading the stored note returns 'Draft two'.",
+          "Choosing Cancel in the confirmation dialog leaves the text area and the stored note unchanged.",
+          "When the chosen file cannot be read, the text area and the stored note keep their previous values and the error message is shown."
+        ],
+        "usesPlatformNeeds": [
+          "local-storage"
+        ],
+        "usesTray": false,
+        "clipboardAccess": "none",
+        "clipboardWatch": false,
+        "usesData": [
+          "Note"
+        ],
+        "usesServices": [],
+        "userFileAccess": "opens",
+        "choiceLists": [],
+        "buildsOn": [
+          "Single note editor"
+        ],
+        "dataOperations": [
+          {
+            "data": "Note",
+            "operations": [
+              "read",
+              "update"
+            ]
+          }
+        ],
+        "narrowsListBy": "none",
+        "invokedBy": "user-control",
+        "runsEverySeconds": null,
+        "runsDailyAt": null,
+        "systemSource": "none",
+        "showsCurrentTime": false,
+        "readsCurrentDay": false,
+        "refreshesEverySeconds": null,
+        "runsAtField": null,
+        "scheduledNotification": null
+      }
+    ],
+    "dataObjects": [
+      {
+        "name": "Note",
+        "purpose": "The single note text the user types, stored on the device and restored after restart.",
+        "sensitivity": "personal",
+        "retentionIntent": "Kept on the device until the user replaces it by typing or by opening a plain text file.",
+        "storage": "records",
+        "writeMode": "atomic-replace",
+        "fields": [
+          {
+            "name": "text",
+            "valueType": "long-text",
+            "optional": false,
+            "min": null,
+            "max": null,
+            "initial": "",
+            "appStamped": null
+          }
+        ],
+        "singleRecord": true,
+        "entryCount": null
+      },
+      {
+        "name": "Markdown export file",
+        "purpose": "A Markdown file the user chooses to save the note text to.",
+        "sensitivity": "personal",
+        "retentionIntent": "Kept at the location the user chose until the user removes it outside the app.",
+        "storage": "document",
+        "writeMode": "atomic-replace",
+        "fields": [
+          {
+            "name": "heading",
+            "valueType": "text",
+            "optional": false,
+            "min": null,
+            "max": null,
+            "initial": "# Scratch Pad",
+            "appStamped": null
+          },
+          {
+            "name": "body",
+            "valueType": "long-text",
+            "optional": false,
+            "min": null,
+            "max": null,
+            "initial": "",
+            "appStamped": null
+          }
+        ],
+        "singleRecord": false,
+        "entryCount": null
+      }
+    ],
+    "externalServices": [],
+    "platformNeeds": [
+      "local-storage"
+    ],
+    "qualityRequirements": [
+      "The automatic save writes the full note text one second after the last keystroke, with no partial text written.",
+      "The stored note is restored into the text area when the app starts."
+    ],
+    "productConstraints": [
+      "The app holds exactly one note; there is no list of notes.",
+      "The note is stored on the device only; no network access is used.",
+      "The Markdown export begins with the heading '# Scratch Pad' followed by one blank line and the note text."
+    ],
+    "ideaCoverage": [
+      {
+        "sentence": 1,
+        "features": [
+          "Single note editor"
+        ],
+        "outsideFeatures": "none"
+      },
+      {
+        "sentence": 2,
+        "features": [
+          "Single note editor"
+        ],
+        "outsideFeatures": "none"
+      },
+      {
+        "sentence": 3,
+        "features": [
+          "Save note as Markdown file",
+          "Open plain text file to replace note"
+        ],
+        "outsideFeatures": "none"
+      },
+      {
+        "sentence": 4,
+        "features": [
+          "Single note editor"
+        ],
+        "outsideFeatures": "none"
+      }
+    ]
+  },
+  "documents": {
+    "PRD.md": {
+      "sha256": "955e918feec4abbf732e06e3a5542f74bba1226c87d2deb21dc780dada809899"
+    },
+    "ARD.md": {
+      "sha256": "88a844065ff16f89e129df27616d027366bec54c8b6f71828747b8111431f150"
+    },
+    "TRD.md": {
+      "sha256": "d9266db3ba886301d78e412cb9635dad9afe56fca77e5b8eb5816430b7f5c385"
+    },
+    "TASKS.md": {
+      "sha256": "721c191f2f2c2151356a0b8846ae2538e38370958a218684e29f7ce53369a2bb"
+    },
+    "AGENTS.md": {
+      "sha256": "464d1052db1b281a5de4957af9635e3863b8d80c92253e5f5bdb3c79c6e80ac8"
+    }
+  },
+  "kit": [
+    {
+      "path": "kit/README.md",
+      "sha256": "9f3e60abe21cce813509d690653cd7d77f62712c2de62ece634a37683f258aa5"
+    },
+    {
+      "path": "kit/package.json",
+      "sha256": "2e71e5712d027be10aa1dc34fc1d475b961d76ef8c19d577ebce46df73ec8dd5"
+    },
+    {
+      "path": "kit/tsconfig.json",
+      "sha256": "b629f7f11091d82741d9f2aa6d0d0f95057e0908068402d8b99fecd349bdb25f"
+    },
+    {
+      "path": "kit/vite.config.ts",
+      "sha256": "d0d5737245887ce2efd6fa63c245ac0edcc81ed4b6f427a45f45ba7c43e4745c"
+    },
+    {
+      "path": "kit/index.html",
+      "sha256": "d0df53d85a31d3518a0ad796212236b17bd9799318021c8d0ff11eadf50f1c3f"
+    },
+    {
+      "path": "kit/src/api.ts",
+      "sha256": "b6ec0095bb5bdb5bddfe461dadc3701dc86c5714fccee27620914e6824413b4e"
+    },
+    {
+      "path": "kit/src/errors.ts",
+      "sha256": "68774d5837d63cfdd48f811b4a2dbc4c26bb4c53dbec5bb90deca4a8e5ecc80b"
+    },
+    {
+      "path": "kit/src/ui.ts",
+      "sha256": "57018ff061aec5af6de67032bf6bc8e3033068bd7a758623d18d46c91b39ea7c"
+    },
+    {
+      "path": "kit/src/store.ts",
+      "sha256": "86149b99f06e4a7a44462780ee5840d469190f2b4f0a8a6b27432a2da4bac7b9"
+    },
+    {
+      "path": "kit/tests/store.test.ts",
+      "sha256": "c9635aca296f193e7612c6aed82a05c31b68fec069dbcfe34466c50bd2f08cb7"
+    },
+    {
+      "path": "kit/src/main.ts",
+      "sha256": "703cd1999f62d523e1c1ea1196753079ff585184cbb1492236f12a7543d4976c"
+    },
+    {
+      "path": "kit/src/style.css",
+      "sha256": "da6a1bb2ff844ccac42a1ca14eaab1671747a035cacf9c7e56761ff3667ac083"
+    },
+    {
+      "path": "kit/tests/kit.test.ts",
+      "sha256": "0a07962a5cee0b7019ec00ff0a1df88995131fbef200d2913b03a6c7c72cbd25"
+    },
+    {
+      "path": "kit/tests/ui.test.ts",
+      "sha256": "5289d13bfef3e45776a73ca3506f50d463f3ebf2d164e1d18876affd7035cd99"
+    },
+    {
+      "path": "kit/app-icon.svg",
+      "sha256": "6e777453cc0b38a99d1e12653b10d56ff15da10901233e5c9d805da22a1ad637"
+    },
+    {
+      "path": "kit/scripts/package_linux.sh",
+      "sha256": "e1f871cc760576dbca940f23094f609c542cbd707d88da066dd268736cb5eb1a"
+    },
+    {
+      "path": "kit/src-tauri/Cargo.toml",
+      "sha256": "87349b8344ba75fdc810dcb86d3a42453150db39d0e88af2e5003999170c743f"
+    },
+    {
+      "path": "kit/src-tauri/build.rs",
+      "sha256": "487059eaf8a947b80f20a9aacac038a5047b2ad69d2401b827376c67d6fe847f"
+    },
+    {
+      "path": "kit/src-tauri/rustfmt.toml",
+      "sha256": "f74204a6f92aa7422a16ecb2ffe2d5bae0f123b778d08b5db1a398a3c9ca4306"
+    },
+    {
+      "path": "kit/src-tauri/src/main.rs",
+      "sha256": "d04edbf1adb85a628fe895dc7d0804e24b5b79e7f8ea2dfb8fdf01a2f0fbddc2"
+    },
+    {
+      "path": "kit/src-tauri/src/lib.rs",
+      "sha256": "87fca50deb8a0e24a66f10570a175a5980ef12914d956a58c1611409fa06865b"
+    },
+    {
+      "path": "kit/src-tauri/src/platform/mod.rs",
+      "sha256": "507546f82742ac7ba765bdf7c1a2cc4eb82205c0bbe703f8141bbd2f9c15c4cb"
+    },
+    {
+      "path": "kit/src-tauri/src/error.rs",
+      "sha256": "185942303fa3a59dc36eef403ff9365318fbb2adca88846a86d017cb3841046b"
+    },
+    {
+      "path": "kit/src-tauri/src/database.rs",
+      "sha256": "97987e8f59d3ce7f3bfa37ed50f1cd8bf848dd999de2954b4c26e0ec84ed1930"
+    },
+    {
+      "path": "kit/src-tauri/tests/kit_tests.rs",
+      "sha256": "618ba49647adc4bb0708e54ca126d54862d63ef92f1635533359fdbca5172554"
+    },
+    {
+      "path": "kit/src-tauri/tauri.conf.json",
+      "sha256": "5a4af96c186b296b49e9da403220f50c30ff812d8325ad48de18bd72e052bbb2"
+    },
+    {
+      "path": "kit/src-tauri/capabilities/default.json",
+      "sha256": "b875a919fe318be06cdf9cec2361b72d7f98058922924e670f83a6cbb69c52e0"
+    }
+  ],
+  "validation": {
+    "status": "pass",
+    "ledger": [
+      {
+        "rule": "graph.ids",
+        "label": "Stable IDs are unique",
+        "status": "pass",
+        "detail": "Verified."
+      },
+      {
+        "rule": "graph.references",
+        "label": "Graph references resolve",
+        "status": "pass",
+        "detail": "Verified."
+      },
+      {
+        "rule": "graph.cycles",
+        "label": "Dependency graph is acyclic",
+        "status": "pass",
+        "detail": "Verified."
+      },
+      {
+        "rule": "graph.dependencies",
+        "label": "Shared contract owners precede dependent features",
+        "status": "pass",
+        "detail": "Verified."
+      },
+      {
+        "rule": "graph.task-scope",
+        "label": "Tasks claim only directly owned feature scope",
+        "status": "pass",
+        "detail": "Verified."
+      },
+      {
+        "rule": "graph.acceptance-ownership",
+        "label": "Task acceptance belongs only to its direct owner or the final gate",
+        "status": "pass",
+        "detail": "Verified."
+      },
+      {
+        "rule": "graph.focused-test-ownership",
+        "label": "Focused tests claim no future-owner behavior",
+        "status": "pass",
+        "detail": "Verified."
+      },
+      {
+        "rule": "graph.ownership",
+        "label": "Owner, file, and test mappings are conflict-free",
+        "status": "pass",
+        "detail": "Verified."
+      },
+      {
+        "rule": "graph.create-before-modify",
+        "label": "Every file is created before modification",
+        "status": "pass",
+        "detail": "Verified."
+      },
+      {
+        "rule": "graph.coverage",
+        "label": "Features and contracts have tasks and focused tests",
+        "status": "pass",
+        "detail": "Verified."
+      },
+      {
+        "rule": "render.deterministic",
+        "label": "Repeated local rendering is byte-identical",
+        "status": "pass",
+        "detail": "Verified."
+      },
+      {
+        "rule": "packet.exact-five",
+        "label": "Packet contains exactly five canonical files",
+        "status": "pass",
+        "detail": "Verified."
+      },
+      {
+        "rule": "packet.non-empty",
+        "label": "Every document is non-empty",
+        "status": "pass",
+        "detail": "Verified."
+      },
+      {
+        "rule": "markdown.valid",
+        "label": "Markdown structure is normalized",
+        "status": "pass",
+        "detail": "Verified."
+      },
+      {
+        "rule": "content.unfinished",
+        "label": "No unfinished or filler content remains",
+        "status": "pass",
+        "detail": "Verified."
+      },
+      {
+        "rule": "content.identity",
+        "label": "Project identities are concrete",
+        "status": "pass",
+        "detail": "Verified."
+      },
+      {
+        "rule": "content.secret-shaped",
+        "label": "No secret-shaped values are present",
+        "status": "pass",
+        "detail": "Verified."
+      },
+      {
+        "rule": "trace.missing-reference",
+        "label": "Every feature and contract traces through all documents",
+        "status": "pass",
+        "detail": "Verified."
+      },
+      {
+        "rule": "stack.leakage",
+        "label": "Selected preset implementation is isolated",
+        "status": "pass",
+        "detail": "Verified."
+      },
+      {
+        "rule": "contract.decisions",
+        "label": "Cross-cutting decisions are complete",
+        "status": "pass",
+        "detail": "Verified."
+      },
+      {
+        "rule": "contract.persistence",
+        "label": "Persistence placement and recovery are concrete",
+        "status": "pass",
+        "detail": "Verified."
+      },
+      {
+        "rule": "contract.persistence-ownership",
+        "label": "Credential and data ownership is consistent",
+        "status": "pass",
+        "detail": "Verified."
+      },
+      {
+        "rule": "contract.persistence-placement",
+        "label": "Each data contract has one valid placement",
+        "status": "pass",
+        "detail": "Verified."
+      },
+      {
+        "rule": "contract.packaging",
+        "label": "Packaging has one dependency-safe authority",
+        "status": "pass",
+        "detail": "Verified."
+      },
+      {
+        "rule": "validation.commands",
+        "label": "Validation and completion commands are present",
+        "status": "pass",
+        "detail": "Verified."
+      },
+      {
+        "rule": "preset.contracts",
+        "label": "Preset lifecycle and accessibility rules are rendered",
+        "status": "pass",
+        "detail": "Verified."
+      },
+      {
+        "rule": "security.executable-injection",
+        "label": "Executable instruction and prompt injection safety",
+        "status": "pass",
+        "detail": "Verified."
+      }
+    ]
+  },
+  "repair": {
+    "model": "claude-sonnet-5-5",
+    "rounds": 1,
+    "edits": [
+      {
+        "finding": 1,
+        "op": "replace",
+        "file": "TRD.md",
+        "find": "create and update return AppError invalid for an empty or whitespace-only required text field (text; Rust stores the value as given, so the form trims every text input before it validates and sends the trimmed value)",
+        "replace": "create and update accept any text for text, including empty text and text with leading or trailing whitespace: Rust stores the value exactly as given, and the editor sends the text exactly as typed, never trimmed (an empty note is a valid note)",
+        "all": false
+      },
+      {
+        "finding": 2,
+        "op": "replace",
+        "file": "TRD.md",
+        "find": "update_note(id: i64, input: NoteInput) returns the updated Note and replaces every field with input, so the caller sends the stored value of each field it does not change.",
+        "replace": "update_note(id: i64, input: NoteInput) returns the updated Note and replaces every field with input, so the caller sends the stored value of each field it does not change. One more command, owned by OWN-DATA-STORE and registered in src-tauri/src/lib.rs, reads the file for FEAT-OPEN-PLAIN-TEXT-FILE-TO-REPLACE-NOTE: read_text_file(path: String) returns String; path is a file the user chose in the Open dialog, Rust resolves it with the filesystem permission helper (std::fs canonicalize; it must exist and be a file, otherwise AppError invalid), reads it fully and decodes it as UTF-8 exactly as stored (no trimming, no newline changes), and returns the text; a file that is not valid UTF-8 returns AppError invalid and a read failure returns AppError storage; it never writes anything.",
+        "all": false
+      },
+      {
+        "finding": 2,
+        "op": "replace",
+        "file": "TASKS.md",
+        "find": "so keep it in two small functions that it can swap out.",
+        "replace": "so keep it in two small functions that it can swap out. Also implement read_text_file(path: String) -> String exactly as the TRD states it (register it in generate_handler!). Its focused test covers: a UTF-8 file returns its exact text (an empty file returns \"\"); a missing path, a directory, and a file with invalid UTF-8 bytes each return AppError invalid and leave the file unchanged; create_note and update_note accept text \"\" and \"   \" and read back exactly the stored text.",
+        "all": false
+      },
+      {
+        "finding": 4,
+        "op": "replace",
+        "file": "TASKS.md",
+        "find": "a status area shared by every message the main screen shows (empty state, no match; failures go through the errors banner); a per-row action area on every list row, built with slots.row(\"row-actions\", record) (a render hook, not one host); an \"actions\" host above the list for the one control of a later feature that works on the whole screen rather than one row: a command over all records (a Save to file button) or the control of one stored setting (a goal field).",
+        "replace": "a \"status\" host shared by every confirmation message the main screen shows (failures go through the errors banner); an \"actions\" host above the text area for the two buttons of the later file features (Open text file and Save as Markdown). There is no list, no row and no per-row action area: the app holds exactly one note.",
+        "all": false
+      },
+      {
+        "finding": 3,
+        "op": "replace",
+        "file": "TASKS.md",
+        "find": "its shape is { note: Note[], loadError: string | null }. Every task changes it only through store.set and every view re-renders from store.subscribe, so one change shows in the list and status area at once.",
+        "replace": "its shape is { note: Note[], draft: string, loadError: string | null } (note holds at most one row; draft is the text exactly as it appears in the text area and can be newer than note[0].text). Every task changes it only through store.set and every view re-renders from store.subscribe, so one change shows in the text area and status area at once.",
+        "all": false
+      },
+      {
+        "finding": 3,
+        "op": "replace",
+        "file": "TASKS.md",
+        "find": "Build the per-row action area with slots.row(\"row-actions\", record) (not a host): call it inside every list row on every render with that row's record and append the element it returns; a later task registers its row control with slots.mountRow(\"row-actions\", render) from src/main.ts, and slots.row calls render(record) for each row, so a control re-renders with its row and reads the record it is given. Show the empty list with emptyState(title) from src/ui.ts using the PRD's text exactly as the title and no hint unless the PRD states one. Sort the rows yourself, never by the command's order (list commands return descending id): by the field and direction the PRD states, ties broken by id in the same direction.",
+        "replace": "Build the one text area here: a native textarea with aria-label \"Note\" in the content area, kept in step with store.get().draft by a store.subscribe view (set its value only when it differs, so the cursor does not jump). Build no list, no row, no empty-state message and no sorting: when nothing is stored the text area is simply empty. Single-note lifecycle: the note is store.get().note[0] (never more than one row). Load: list_note(); draft is note[0]?.text ?? \"\". Every input event calls setDraft(text): store.set({ draft: text }) and restarts a 1000 ms timer (timers.clear the old id, then timers.set(saveDraft, 1000)). saveDraft() reads store.get().draft when it runs (never an older text) and writes through one serialized chain: a write starts only after the previous one settled, so at most one write is in flight and a second create is impossible. A write is update_note(note[0].id, { text }) when a row exists, otherwise create_note({ text }); the returned record is patched into the state as note: [record]. The text is sent exactly as typed, never trimmed, and empty text is a valid note. A failed write leaves state.note as it was and the draft in the text area, and shows errors.show(\"The note could not be saved.\", saveDraft). The factory returns { setDraft(text: string): void, replaceNote(text: string): Promise<boolean>, flush(): Promise<void> }. replaceNote(text) clears the pending timer, sets draft to text, writes it at once through the same chain, and resolves true when stored, or false after showing the failure message. flush() clears a pending timer and writes the draft at once, otherwise awaits the last write; it never rejects. src/main.ts passes timers: { set: (fn, ms) => window.setTimeout(fn, ms), clear: id => window.clearTimeout(id) } and registers getCurrentWindow().onCloseRequested(async () => { await editor.flush() }) from @tauri-apps/api/window, so text typed in the last second is written before the window closes; the kit capability file already allows core:window:allow-destroy. Export the editor object for the later tasks' main.ts wiring.",
+        "all": false
+      },
+      {
+        "finding": 3,
+        "op": "replace",
+        "file": "TASKS.md",
+        "find": "(the empty state, a no-match message) inside",
+        "replace": "(none in this packet) inside",
+        "all": false
+      },
+      {
+        "finding": 3,
+        "op": "replace",
+        "file": "TASKS.md",
+        "find": "You also own the one load of every record list at launch and the single message shown when that load fails,",
+        "replace": "You also own the one load of the note at launch (list_note) and the single message shown when that load fails, exactly \"The note could not be loaded.\" (the text area is then empty),",
+        "all": false
+      },
+      {
+        "finding": 3,
+        "op": "replace",
+        "file": "TASKS.md",
+        "find": "the shared view state (the store); main.ts passes the real ones",
+        "replace": "the shared view state (the store), timers ({ set(fn: () => void, ms: number): number, clear(id: number): void }); main.ts passes the real ones",
+        "all": false
+      },
+      {
+        "finding": 3,
+        "op": "replace",
+        "file": "TASKS.md",
+        "find": "shows that stored text in the text area.; Contract CON-SINGLE-NOTE-EDITOR-INTERFACE",
+        "replace": "shows that stored text in the text area.; Clearing the text area to empty and advancing the clock by 1000 ms stores an empty note (no error), and whitespace is stored untrimmed.; On a fresh install the first save calls create_note once and every later save calls update_note with that id; saves never overlap.; Calling flush() after typing, without advancing the clock, stores the latest text at once (this runs when the window closes).; Contract CON-SINGLE-NOTE-EDITOR-INTERFACE",
+        "all": false
+      },
+      {
+        "finding": 4,
+        "op": "replace",
+        "file": "TASKS.md",
+        "find": "(the per-row action area): build them",
+        "replace": "(the \"actions\" host): build them",
+        "all": false
+      },
+      {
+        "finding": 4,
+        "op": "replace",
+        "file": "TASKS.md",
+        "find": "update_note replaces every field, so every update you send carries the full stored record (every field of the shared view state's record) with only the field your behavior changes replaced. Your control is a per-row control: register slots.mountRow(\"row-actions\", render) from src/main.ts, where render(record) returns the control for that row and the list calls it on every re-render, so read the record it is given, never a captured one. A failure message the PRD places in the row renders inside that control next to a Retry button that repeats the command (errors.show is for messages not tied to a row).",
+        "replace": "You write the note only through the editor: besides the dependencies listed at the end of this prompt the factory also takes editor ({ replaceNote(text: string): Promise<boolean> }, the one TASK-05 exports) and confirm (the confirmDialog function of src/ui.ts). Never call update_note or create_note and patch no shared state yourself: replaceNote does it, cancels a pending save of older text, and creates the single note row when none exists yet. Build one button labelled \"Open text file\" and mount it with slots.mount(\"actions\", button) from src/main.ts; there is no per-row control. Flow: call the dialog adapter with no file filter; null (cancelled) changes nothing and shows nothing. With a path, await confirm(\"Replace the current note with the contents of this file?\", \"Replace\"); false (Cancel) changes and calls nothing. On Replace, text = await call<string>(\"read_text_file\", { path }) and then editor.replaceNote(text). A read failure leaves the text area and the stored note unchanged and shows errors.show(\"The file could not be opened.\", repeat), where repeat reads the same path again without asking again.",
+        "all": false
+      },
+      {
+        "finding": 2,
+        "op": "replace",
+        "file": "TASKS.md",
+        "find": "The commands this feature calls, all owned by OWN-DATA-STORE: update_note(id, input).",
+        "replace": "The command this feature calls, owned by OWN-DATA-STORE: read_text_file(path).",
+        "all": false
+      },
+      {
+        "finding": 2,
+        "op": "replace",
+        "file": "TASKS.md",
+        "find": "When the chosen file cannot be read, the text area and the stored note keep their previous values and the error message is shown.; Contract CON-OPEN-",
+        "replace": "When the chosen file cannot be read, the text area and the stored note keep their previous values and the error message is shown.; Replace cancels a pending save of older text, so that text never overwrites the replacement.; Replace on a fresh install (no stored row yet) stores the text as the note.; Contract CON-OPEN-",
+        "all": false
+      },
+      {
+        "finding": 5,
+        "op": "replace",
+        "file": "TASKS.md",
+        "find": "Mount your control with slots.mount from src/main.ts.",
+        "replace": "Mount your control with slots.mount from src/main.ts. Build one button labelled \"Save as Markdown\"; this feature changes no shared state and never writes the stored note. Its content string is '# Scratch Pad', two line feeds, then store.get().draft exactly as it is (the text in the text area, which can be newer than store.get().note[0]; add no trailing newline). The dialog adapter is called with save({ defaultPath: \"scratch-pad.md\" }) and returns the chosen path or null. On success the status element reads exactly \"The file was saved.\"; on failure errors.show(\"The file could not be saved.\", repeat).",
+        "all": false
+      },
+      {
+        "finding": 5,
+        "op": "replace",
+        "file": "TASKS.md",
+        "find": "When the write fails, a pre-existing file at the chosen location still has its previous content.; Contract CON-SAVE-NOTE-AS-MARKDOWN-FILE-INTERFACE",
+        "replace": "When the write fails, a pre-existing file at the chosen location still has its previous content.; The exported text is the draft in the text area even when it was typed less than one second earlier and is not yet stored.; Contract CON-SAVE-NOTE-AS-MARKDOWN-FILE-INTERFACE",
+        "all": false
+      },
+      {
+        "finding": 6,
+        "op": "replace",
+        "file": "TRD.md",
+        "find": "- Decision: Stop new work, cancel active operations, and preserve only state covered by the persistence contracts.",
+        "replace": "- Decision: Stop new work, cancel active operations, and preserve only state covered by the persistence contracts. The one pending debounced save of the single note is not discarded: on window close the single note editor (OWN-SINGLE-NOTE-EDITOR) flush() writes the latest text before the window is destroyed (src/main.ts registers it with onCloseRequested); if that write fails the window still closes.",
+        "all": false
+      },
+      {
+        "finding": 6,
+        "op": "replace",
+        "file": "ARD.md",
+        "find": "preserve only state covered by the persistence contracts. Cleanup",
+        "replace": "preserve only state covered by the persistence contracts, except that the single note editor flushes its pending debounced save on window close. Cleanup",
+        "all": false
+      },
+      {
+        "finding": 6,
+        "op": "replace",
+        "file": "PRD.md",
+        "find": "- The stored note is restored into the text area when the app starts.",
+        "replace": "- The stored note is restored into the text area when the app starts.\n- Text typed within the last second before the window is closed is written before the app exits.",
+        "all": false
+      },
+      {
+        "finding": 6,
+        "op": "replace",
+        "file": "kit/src-tauri/capabilities/default.json",
+        "find": "\"core:default\",",
+        "replace": "\"core:default\",\n    \"core:window:allow-destroy\",",
+        "all": false
+      },
+      {
+        "finding": 6,
+        "op": "replace",
+        "file": "kit/README.md",
+        "find": "lists only core:default and the permissions of the plugins lib.rs initializes.",
+        "replace": "lists only core:default, core:window:allow-destroy (so the editor can flush its pending save before the window closes), and the permissions of the plugins lib.rs initializes.",
+        "all": false
+      }
+    ],
+    "review": {
+      "slug": "scratch-pad",
+      "blocking": [],
+      "polish": [
+        {
+          "where": "TASKS.md TASK-06-OPEN-PLAIN-TEXT-FILE-TO-REPLACE-NOTE task prompt",
+          "quote": "Offer a default file name that fits the document, then call the document command with the chosen path; a cancelled dialog changes nothing and shows no error.",
+          "why": "The open dialog has no default name, and the flow is open, then confirm, then read_text_file. The sentence is boilerplate and implies a save-style flow. A coder can ignore it but may hesitate.",
+          "fix": "Remove the default-file-name sentence from the Open task prompt, which is generic boilerplate that does not apply."
+        },
+        {
+          "where": "TASKS.md TASK-06 and TASK-07 task prompts",
+          "quote": "refresh it after your own writes by patching it with the record your command returns (after a delete, remove that id), never by calling a list command",
+          "why": "The packet has no delete, no list and no per-row control. These clauses are inapplicable, and the 'empty list' clause could be read as making the controls conditionally disabled.",
+          "fix": "Drop the delete, empty-list and nothing-to-export boilerplate from the task prompts for TASK-06 and TASK-07."
+        },
+        {
+          "where": "TASKS.md TASK-07-SAVE-NOTE-AS-MARKDOWN-FILE acceptance criteria",
+          "quote": "When the write fails, a pre-existing file at the chosen location still has its previous content.",
+          "why": "The focused test is a TypeScript test with a fake call, so it cannot check file content. Only TASK-02's Rust test can verify this criterion, but the acceptance ID is mapped to OWN-SAVE-NOTE. The agent must guess how the feature test proves it.",
+          "fix": "Add a short statement to PRD and TRD that the Rust command writes no note data and that the TS test fake only asserts the content string and path, with atomicity proven in datastore_tests."
+        },
+        {
+          "where": "PRD.md UX Requirements",
+          "quote": "Text typed within the last second before the window is closed is written before the app exits.",
+          "why": "The close-flush behaviour is in the PRD UX list and the TASK-05 criteria, but not among the PRD feature acceptance outcomes or the ACC IDs, so it has no traceable ACC.",
+          "fix": "Add an ACC (for example ACC-SINGLE-NOTE-EDITOR-05) to the PRD and TRD stating that calling flush() stores the latest text without advancing the clock."
+        },
+        {
+          "where": "PRD.md FEAT-SINGLE-NOTE-EDITOR Behavior",
+          "quote": "If loading the stored note fails, the text area is shown empty and one error message states the note could not be loaded.",
+          "why": "No acceptance outcome covers this. If the load fails and the user then types, note[] is empty, so the first save calls create_note and adds a second row beside the unreadable stored one. This conflicts with 'exactly one note' and is not specified.",
+          "fix": "Add an ACC for the load-failure message and state that the first save after a failed load must update the existing row, or that saving is blocked until a retry succeeds."
+        },
+        {
+          "where": "TASKS.md TASK-05-SINGLE-NOTE-EDITOR task prompt (replaceNote)",
+          "quote": "resolves true when stored, or false after showing the failure message",
+          "why": "The PRD gives no message for a failed store write after Replace, and the Open task says 'The file could not be opened' only for read failures. The agent must guess which message appears when the file reads fine but the store write fails.",
+          "fix": "State in TASK-05 and the Open task that a failed replace write shows 'The note could not be saved.' with retry, or the generic notice, explicitly."
+        },
+        {
+          "where": "TRD.md CON-DATA-MARKDOWN-EXPORT-FILE Interface",
+          "quote": "writing every date or time it shows in local time (the stored UTC value converted; this is the one time rule for every exported file; its test sets TZ or injects the offset so the exported bytes are deterministic)",
+          "why": "The export contains no dates. The clause could prompt a pointless TZ-injection requirement in the test. The 'Reject invalid or incomplete records' and 'every stored row' recovery text also does not fit a file contract.",
+          "fix": "Remove the local-time and 'stored row' boilerplate from CON-DATA-MARKDOWN-EXPORT-FILE, or scope it to 'no dates in this export'."
+        }
+      ],
+      "verdict": "No blocking defects. The idea maps cleanly to three features with acceptance criteria. Task order is dependency-safe, and the shared-file lines in AGENTS agree with the TASKS create/modify lists. The data contract, commands and wire format are fully specified. The delayed-save case is covered: the TRD names a close-time flush with its owner and mechanism (onCloseRequested, flush()), the kit capability allows destroy, and TASK-05 has a flush criterion. The remaining items are polish: boilerplate that does not apply, and two small spec gaps."
+    },
+    "kitBuilt": true,
+    "kitBuildPassed": true,
+    "verdict": "agent-ready",
+    "agentReady": true
+  }
+}

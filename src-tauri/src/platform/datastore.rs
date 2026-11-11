@@ -1,5 +1,5 @@
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use rusqlite::Connection;
@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use tauri::State;
 
 use crate::error::AppError;
+use crate::platform::permissioncoordinator::{existing_file, save_target};
 use crate::AppState;
 
 static TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -20,34 +21,6 @@ pub struct Note {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct NoteInput {
     pub text: String,
-}
-
-fn existing_file(path: &Path) -> Result<PathBuf, AppError> {
-    let canonical = std::fs::canonicalize(path)
-        .map_err(|_| AppError::Invalid("The file could not be opened.".into()))?;
-    if !canonical.is_file() {
-        return Err(AppError::Invalid("The file could not be opened.".into()));
-    }
-    Ok(canonical)
-}
-
-fn save_target(path: &Path) -> Result<PathBuf, AppError> {
-    let file_name =
-        path.file_name().ok_or_else(|| AppError::Invalid("The file could not be saved.".into()))?;
-    let parent = path
-        .parent()
-        .filter(|p| !p.as_os_str().is_empty())
-        .ok_or_else(|| AppError::Invalid("The file could not be saved.".into()))?;
-    let canonical_parent = std::fs::canonicalize(parent)
-        .map_err(|_| AppError::Invalid("The file could not be saved.".into()))?;
-    if !canonical_parent.is_dir() {
-        return Err(AppError::Invalid("The file could not be saved.".into()));
-    }
-    let target = canonical_parent.join(file_name);
-    if target.is_dir() {
-        return Err(AppError::Invalid("The file could not be saved.".into()));
-    }
-    Ok(target)
 }
 
 pub fn create_note_in_db(connection: &mut Connection, input: NoteInput) -> Result<Note, AppError> {

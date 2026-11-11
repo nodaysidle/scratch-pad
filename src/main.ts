@@ -1,6 +1,9 @@
+import { open } from "@tauri-apps/plugin-dialog"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 import { call } from "./api"
 import { createErrorBanner } from "./errors"
+import { confirmDialog } from "./ui"
+import { createOpenPlainTextFileToReplaceNoteFeature } from "./features/openplaintextfiletoreplacenotefeature"
 import {
   createSingleNoteEditorFeature,
   slots,
@@ -31,6 +34,17 @@ export const editor = createSingleNoteEditorFeature({
     clear: id => window.clearTimeout(id),
   },
 })
+
+export const openFeature = createOpenPlainTextFileToReplaceNoteFeature({
+  call,
+  errors,
+  store,
+  editor,
+  confirm: confirmDialog,
+  openDialog: () => open({ multiple: false, directory: false }),
+})
+
+slots.mount("actions", openFeature.button)
 
 try {
   void getCurrentWindow().onCloseRequested(async () => {

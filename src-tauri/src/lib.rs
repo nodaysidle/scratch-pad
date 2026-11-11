@@ -45,7 +45,15 @@ pub fn context<R: Runtime>() -> tauri::Context<R> {
 /// Plugins and commands only; `run()` adds state and the window behavior.
 pub fn app_builder<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
     let builder = builder.plugin(tauri_plugin_dialog::init());
-    builder.invoke_handler(tauri::generate_handler![schema_version])
+    builder.invoke_handler(tauri::generate_handler![
+        schema_version,
+        platform::datastore::create_note,
+        platform::datastore::list_note,
+        platform::datastore::get_note,
+        platform::datastore::update_note,
+        platform::datastore::read_text_file,
+        platform::datastore::write_markdown_export_file,
+    ])
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

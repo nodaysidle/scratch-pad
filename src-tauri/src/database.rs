@@ -5,7 +5,8 @@ use rusqlite::Connection;
 use crate::error::AppError;
 
 /// Schema changes, applied in order. Feature tasks append their tables; never edit one that has shipped.
-pub const MIGRATIONS: &[&str] = &[];
+pub const MIGRATIONS: &[&str] =
+    &["CREATE TABLE note (id INTEGER PRIMARY KEY AUTOINCREMENT, text TEXT NOT NULL);"];
 
 /// The records database in the app-data folder (created when missing); PRAGMA user_version holds the schema version.
 pub fn open(folder: &Path) -> Result<Connection, AppError> {

@@ -1,9 +1,10 @@
-import { open } from "@tauri-apps/plugin-dialog"
+import { open, save } from "@tauri-apps/plugin-dialog"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 import { call } from "./api"
 import { createErrorBanner } from "./errors"
 import { confirmDialog } from "./ui"
 import { createOpenPlainTextFileToReplaceNoteFeature } from "./features/openplaintextfiletoreplacenotefeature"
+import { createSaveNoteAsMarkdownFileFeature } from "./features/savenoteasmarkdownfilefeature"
 import {
   createSingleNoteEditorFeature,
   slots,
@@ -44,7 +45,15 @@ export const openFeature = createOpenPlainTextFileToReplaceNoteFeature({
   openDialog: () => open({ multiple: false, directory: false }),
 })
 
-slots.mount("actions", openFeature.button)
+export const saveFeature = createSaveNoteAsMarkdownFileFeature({
+  call,
+  errors,
+  store,
+  saveDialog: opts => save(opts),
+})
+
+slots.mount("actions", openFeature.button, saveFeature.button)
+slots.mount("status", saveFeature.status)
 
 try {
   void getCurrentWindow().onCloseRequested(async () => {

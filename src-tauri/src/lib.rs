@@ -61,12 +61,17 @@ pub fn run() {
     app_builder(tauri::Builder::default())
         .setup(|app| {
             let folder = app.path().app_data_dir()?;
+            platform::lifecyclecoordinator::launch(&folder)?;
             manage_state(app, &folder)?;
             Ok(())
         })
         .build(context())
         .expect("the app could not start")
-        .run(|_app, _event| {});
+        .run(|_app, event| {
+            if let tauri::RunEvent::Exit = event {
+                platform::lifecyclecoordinator::exit();
+            }
+        });
 }
 
 pub mod platform;

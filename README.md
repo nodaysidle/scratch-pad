@@ -37,6 +37,39 @@ The AppImage build needs two local fixes to the tools Tauri downloads into
 described in `BUILD-NOTES.md`, entries 2 and 3. If that cache is cleared, apply
 them again.
 
+## Keyboard
+
+| Key | Action |
+|---|---|
+| `Ctrl+O` | Open text file (replaces the note after a confirmation) |
+| `Ctrl+S` | Save as Markdown |
+| `Esc` | Cancel the confirmation |
+
+The note has focus at launch. Closing is left to the window manager
+(`SUPER+W` on Omarchy).
+
+## Design
+
+Scratch Pad is styled as an Omarchy/Hyprland app, like a terminal: it fills
+whatever tile it is given and draws no chrome of its own.
+
+- No header and no window decorations (`decorations: false`); Hyprland draws the
+  border, rounding and shadow.
+- One font: the system `monospace` family at 13px, so it follows the Omarchy font setting.
+- Every colour derives from three CSS variables in `src/style.css`: `--bg`, `--fg`
+  and `--accent`. The accent is used for the caret, focus and outlines only,
+  never as a fill behind text.
+- Controls are 28px high with a 1px border and square corners. No animations.
+- Minimum window size is 360x200; the layout must work at that size.
+
+These rules replace the look described in `kit/README.md` ("system font",
+"no task edits src/style.css"), which applied to the original build only.
+
+To float it as a scratchpad, add a rule to `~/.config/hypr/hyprland.lua` once
+you know the window class (`hyprctl clients` while the app runs):
+
+    o.window("^(scratch-pad|com\\.scratch\\.pad)$", { tag = "+floating-window" })
+
 ## Layout
 
 | Path | What it holds |

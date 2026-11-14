@@ -39,5 +39,7 @@ export const createErrorBanner = (host: HTMLElement) => {
     /** A failed command: shows the message Rust wrote, never a raw runtime error. */
     report: (error: unknown, onRetry?: () => void) => show(messageFor(error), onRetry),
     dismiss: () => { banner.hidden = true },
+    /** Hides the banner if it still shows this message: the operation that failed has now succeeded. */
+    clear: (message: string) => { if (text.textContent === message) banner.hidden = true },
   }
 }

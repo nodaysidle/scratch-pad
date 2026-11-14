@@ -28,14 +28,29 @@ the gate before any commit.
 ## Build and install
 
 ```sh
-./scripts/package_linux.sh            # builds dist/scratch-pad.AppImage
-./scripts/package_linux.sh --install  # also installs it under ~/.local with a desktop entry
+./scripts/package_linux.sh --install-binary
 ```
 
-The AppImage build needs two local fixes to the tools Tauri downloads into
-`~/.cache/tauri`; without them it fails on current Arch Linux. They are
-described in `BUILD-NOTES.md`, entries 2 and 3. If that cache is cleared, apply
-them again.
+This builds the release binary and installs it for the current user:
+
+- `~/.local/bin/scratch-pad`, with the previous binary kept in `dist/rollback/`;
+- the icon `~/.local/share/icons/hicolor/scalable/apps/scratch-pad.svg`;
+- the launcher entry `~/.local/share/applications/scratch-pad.desktop`.
+
+The binary, the entry, the icon and the window class are all named
+`scratch-pad`, so the app appears in the Omarchy launcher (`Super + Space`)
+with its icon. Use `scratch-pad` as the class in Hyprland window rules.
+
+The app can also be packaged as an AppImage:
+
+```sh
+./scripts/package_linux.sh            # builds dist/scratch-pad.AppImage
+./scripts/package_linux.sh --install  # also installs the AppImage under ~/.local
+```
+
+On current Arch Linux that build fails inside the `linuxdeploy` tool Tauri
+downloads into `~/.cache/tauri`. `BUILD-NOTES.md`, entries 2 and 3, describes
+the two local fixes it needs.
 
 ## Keyboard
 
@@ -111,7 +126,7 @@ the frontend side is `src/font.ts`.
 | `src/` | TypeScript frontend: `main.ts` wires the features in `src/features/` |
 | `src-tauri/src/` | Rust commands, SQLite migrations, file access |
 | `tests/`, `src-tauri/tests/` | Vitest and cargo tests |
-| `scripts/package_linux.sh` | AppImage build and install |
+| `scripts/package_linux.sh` | Build and install (binary or AppImage) |
 | `PRD.md`, `ARD.md`, `TRD.md`, `TASKS.md`, `AGENTS.md` | The specification the app was built from |
 | `kit/` | Frozen snapshot of the starter files the build began with. Not part of the app; do not edit. `kit/README.md` holds the original build-time rules. |
 | `plans/` | Improvement plans and their status |

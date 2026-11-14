@@ -102,6 +102,21 @@ describe("SingleNoteEditorFeature", () => {
     expect(document.activeElement).toBe(textarea)
   })
 
+  it("returns its textarea and shows a hint in an empty note", () => {
+    const editor = createSingleNoteEditorFeature({
+      call: async <T>(command: string): Promise<T> => {
+        if (command === "list_note") return [] as unknown as T
+        throw new Error(`unexpected ${command}`)
+      },
+      errors: createErrorBanner(root),
+      store: createNoteStore(),
+      timers: createFakeTimers().timers,
+    })
+
+    expect(editor.textarea).toBe(document.querySelector('textarea[aria-label="Note"]'))
+    expect(editor.textarea.placeholder).toBe("Type here. The note saves as you type.")
+  })
+
   it("shows empty text area and error banner with retry when initial load fails", async () => {
     let shouldFail = true
     const stored: Note[] = [{ id: 1, text: "Recovered after retry" }]

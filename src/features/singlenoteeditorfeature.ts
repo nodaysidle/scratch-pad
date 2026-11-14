@@ -48,9 +48,14 @@ export interface SingleNoteEditor {
   flush: () => Promise<boolean>
 }
 
+/** The editor as main.ts sees it: features that read the cursor or selection need the element. */
+export interface SingleNoteEditorView extends SingleNoteEditor {
+  textarea: HTMLTextAreaElement
+}
+
 export const createSingleNoteEditorFeature = (
   deps: SingleNoteEditorDeps,
-): SingleNoteEditor => {
+): SingleNoteEditorView => {
   const activeSlots = deps.slots ?? slots
   const host =
     deps.host ??
@@ -66,6 +71,7 @@ export const createSingleNoteEditorFeature = (
   textarea.className = "editor"
   textarea.setAttribute("aria-label", "Note")
   textarea.spellcheck = false
+  textarea.placeholder = "Type here. The note saves as you type."
   textarea.readOnly = true
 
   const statusBar = document.createElement("footer")
@@ -178,5 +184,6 @@ export const createSingleNoteEditorFeature = (
     setDraft,
     replaceNote,
     flush,
+    textarea,
   }
 }

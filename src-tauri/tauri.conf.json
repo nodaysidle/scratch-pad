@@ -14,10 +14,11 @@
       {
         "label": "main",
         "title": "Scratch Pad",
-        "width": 960,
-        "height": 640,
-        "minWidth": 720,
-        "minHeight": 480
+        "width": 875,
+        "height": 600,
+        "minWidth": 360,
+        "minHeight": 200,
+        "decorations": false
       }
     ],
     "security": {

@@ -276,4 +276,186 @@ describe("SingleNoteEditorFeature", () => {
 
     expect(stored).toEqual([{ id: 7, text: "Flushed while create in flight" }])
   })
+  it("does not create a second note when the first load failed", async () => {
+    const calls: Array<{ command: string; args: unknown }> = []
+    let failList = true
+    const clock = createFakeTimers()
+    const store = createNoteStore()
+    const errors = createErrorBanner(root)
+
+    createSingleNoteEditorFeature({
+      call: async <T>(command: string, args?: Record<string, unknown>): Promise<T> => {
+        calls.push({ command, args })
+        if (command === "list_note") {
+          if (failList) throw { kind: "storage", message: "db error" }
+          return [{ id: 1, text: "Original" }] as unknown as T
+        }
+        throw new Error(`unexpected ${command}`)
+      },
+      errors,
+      store,
+      timers: clock.timers,
+    })
+
+    await flushMicrotasks()
+    const textarea = document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Note"]')!
+    expect(textarea.readOnly).toBe(true)
+
+    textarea.value = "typed"
+    textarea.dispatchEvent(new Event("input"))
+    clock.advance(1000)
+    await flushMicrotasks()
+    expect(calls.filter(c => c.command === "create_note" || c.command === "update_note")).toEqual([])
+
+    failList = false
+    const banner = document.querySelector<HTMLElement>(".error-banner")!
+    const retryBtn = [...banner.querySelectorAll("button")].find(b => b.textContent === "Retry")!
+    retryBtn.click()
+    await flushMicrotasks()
+
+    expect(textarea.readOnly).toBe(false)
+    expect(textarea.value).toBe("Original")
+    expect(banner.hidden).toBe(true)
+  })
+
+  it("ignores typing until the stored note has loaded", async () => {
+    const calls: Array<{ command: string; args: unknown }> = []
+    let resolveList: ((notes: Note[]) => void) | null = null
+    const clock = createFakeTimers()
+    const store = createNoteStore()
+    const errors = createErrorBanner(root)
+
+    const editor = createSingleNoteEditorFeature({
+      call: async <T>(command: string, args?: Record<string, unknown>): Promise<T> => {
+        calls.push({ command, args })
+        if (command === "list_note") {
+          return new Promise<Note[]>(resolve => {
+            resolveList = resolve
+          }) as unknown as T
+        }
+        throw new Error(`unexpected ${command}`)
+      },
+      errors,
+      store,
+      timers: clock.timers,
+    })
+
+    const textarea = document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Note"]')!
+    expect(textarea.readOnly).toBe(true)
+    editor.setDraft("early")
+    expect(store.get().draft).toBe("")
+
+    resolveList!([{ id: 1, text: "Stored" }])
+    await flushMicrotasks()
+    expect(textarea.value).toBe("Stored")
+
+    clock.advance(1000)
+    await flushMicrotasks()
+    expect(calls.filter(c => c.command === "create_note" || c.command === "update_note")).toEqual([])
+  })
+
+  it("flush reports a failed save and retries an earlier failed save", async () => {
+    const stored: Note[] = [{ id: 1, text: "Initial" }]
+    const calls: Array<{ command: string; args: unknown }> = []
+    let failWrites = true
+    const clock = createFakeTimers()
+    const store = createNoteStore()
+    const errors = createErrorBanner(root)
+
+    const editor = createSingleNoteEditorFeature({
+      call: async <T>(command: string, args?: Record<string, unknown>): Promise<T> => {
+        calls.push({ command, args })
+        if (command === "list_note") return [...stored] as unknown as T
+        if (command === "update_note") {
+          if (failWrites) throw { kind: "storage", message: "disk full" }
+          const { id, input } = args as { id: number; input: { text: string } }
+          const updated: Note = { id, text: input.text }
+          stored.splice(0, stored.length, updated)
+          return updated as unknown as T
+        }
+        throw new Error(`unexpected ${command}`)
+      },
+      errors,
+      store,
+      timers: clock.timers,
+    })
+
+    await flushMicrotasks()
+    editor.setDraft("New")
+    clock.advance(1000)
+    await flushMicrotasks()
+
+    expect(await editor.flush()).toBe(false)
+    failWrites = false
+    expect(await editor.flush()).toBe(true)
+    expect(stored).toEqual([{ id: 1, text: "New" }])
+
+    const updates = calls.filter(c => c.command === "update_note").length
+    expect(await editor.flush()).toBe(true)
+    expect(calls.filter(c => c.command === "update_note").length).toBe(updates)
+  })
+
+  it("hides its error message once a later save succeeds", async () => {
+    const stored: Note[] = [{ id: 1, text: "Initial" }]
+    let failWrites = true
+    const clock = createFakeTimers()
+    const store = createNoteStore()
+    const errors = createErrorBanner(root)
+
+    createSingleNoteEditorFeature({
+      call: async <T>(command: string, args?: Record<string, unknown>): Promise<T> => {
+        if (command === "list_note") return [...stored] as unknown as T
+        if (command === "update_note") {
+          if (failWrites) throw { kind: "storage", message: "disk full" }
+          const { id, input } = args as { id: number; input: { text: string } }
+          return { id, text: input.text } as unknown as T
+        }
+        throw new Error(`unexpected ${command}`)
+      },
+      errors,
+      store,
+      timers: clock.timers,
+    })
+
+    await flushMicrotasks()
+    const textarea = document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Note"]')!
+    textarea.value = "New"
+    textarea.dispatchEvent(new Event("input"))
+    clock.advance(1000)
+    await flushMicrotasks()
+
+    const banner = document.querySelector<HTMLElement>(".error-banner")!
+    expect(banner.hidden).toBe(false)
+    expect(banner.querySelector("p")?.textContent).toBe("The note could not be saved.")
+
+    failWrites = false
+    textarea.value = "Newer"
+    textarea.dispatchEvent(new Event("input"))
+    clock.advance(1000)
+    await flushMicrotasks()
+
+    expect(banner.hidden).toBe(true)
+  })
+
+  it("flush does not create a note when nothing was typed", async () => {
+    const calls: Array<{ command: string; args: unknown }> = []
+    const clock = createFakeTimers()
+    const store = createNoteStore()
+    const errors = createErrorBanner(root)
+
+    const editor = createSingleNoteEditorFeature({
+      call: async <T>(command: string, args?: Record<string, unknown>): Promise<T> => {
+        calls.push({ command, args })
+        if (command === "list_note") return [] as unknown as T
+        throw new Error(`unexpected ${command}`)
+      },
+      errors,
+      store,
+      timers: clock.timers,
+    })
+
+    await flushMicrotasks()
+    expect(await editor.flush()).toBe(true)
+    expect(calls.filter(c => c.command === "create_note")).toEqual([])
+  })
 })

@@ -74,6 +74,7 @@ Scratch Pad is a single-note app: the user types into one text area, the text is
 - CON-SECURITY-BOUNDARY: Minimize collected data and keep it inside the preset-defined owner, storage, and integration boundaries. Protect Note as personal data and never expose it through logs or diagnostics. Protect Markdown export file as personal data and never expose it through logs or diagnostics.
 - CON-PLATFORM-FILES: Read and write only paths the user chooses through the dialog; the app never scans a broad folder or keeps a copy of a user document.
 - CON-PLATFORM-THEME: One fixed exception to CON-PLATFORM-FILES: the app reads the active Omarchy theme palette at ~/.config/omarchy/current/theme/colors.toml through the theme_palette command. It is read-only, never written, and only an allowlist of colour keys with validated #rrggbb values (plus mode light or dark) reaches the frontend.
+- CON-PLATFORM-FONT: A second fixed exception to CON-PLATFORM-FILES: the app reads the font size from the default terminal's config (~/.config/xdg-terminals.list, then ghostty/config, alacritty/alacritty.toml, kitty/kitty.conf or foot/foot.ini) through the terminal_font command. It is read-only, and only one validated number (6 to 72 points) reaches the frontend.
 
 ## Accessibility Boundary
 

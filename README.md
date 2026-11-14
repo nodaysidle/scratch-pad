@@ -86,6 +86,19 @@ switching the Omarchy theme recolours an open window without a restart.
 The Rust side is `src-tauri/src/platform/theme.rs` (one command, a fixed path,
 an allowlist of keys); the frontend side is `src/theme.ts`.
 
+## Font
+
+The note uses the system `monospace` font, which Omarchy sets to the same
+family as the terminal (`omarchy font set <name>` changes both). The size is
+read from the default terminal's config and checked once a second, so the note
+renders at the terminal's pixel size and follows it when it changes. To change
+the size, change the terminal's: for Ghostty, `font-size` in
+`~/.config/ghostty/config`.
+
+Supported terminals: Ghostty, Alacritty, kitty and foot. Without one of their
+configs the note uses 13px. The Rust side is `src-tauri/src/platform/font.rs`;
+the frontend side is `src/font.ts`.
+
 ## Layout
 
 | Path | What it holds |

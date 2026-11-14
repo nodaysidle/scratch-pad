@@ -4,6 +4,7 @@ import { call } from "./api"
 import { createCloseHandler } from "./close"
 import { createErrorBanner } from "./errors"
 import { bindShortcuts } from "./shortcuts"
+import { followTheme } from "./theme"
 import { confirmDialog } from "./ui"
 import { createOpenPlainTextFileToReplaceNoteFeature } from "./features/openplaintextfiletoreplacenotefeature"
 import { createSaveNoteAsMarkdownFileFeature } from "./features/savenoteasmarkdownfilefeature"
@@ -57,6 +58,12 @@ saveFeature.button.title = "Ctrl+S"
 bindShortcuts(document, {
   open: () => void openFeature.openFile(),
   save: () => void saveFeature.saveMarkdown(),
+})
+
+followTheme({
+  call,
+  root: document.documentElement,
+  every: (fn, ms) => window.setInterval(fn, ms),
 })
 
 try {

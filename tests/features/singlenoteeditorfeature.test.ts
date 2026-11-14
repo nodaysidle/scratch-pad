@@ -77,6 +77,31 @@ describe("SingleNoteEditorFeature", () => {
     expect(store.get().draft).toBe("Stored note from earlier")
   })
 
+  it("lays out the note above a status bar and focuses it once loaded", async () => {
+    createSingleNoteEditorFeature({
+      call: async <T>(command: string): Promise<T> => {
+        if (command === "list_note") return [] as unknown as T
+        throw new Error(`unexpected ${command}`)
+      },
+      errors: createErrorBanner(root),
+      store: createNoteStore(),
+      timers: createFakeTimers().timers,
+    })
+
+    await flushMicrotasks()
+
+    const content = document.querySelector(".app-content")!
+    expect(content.children.length).toBe(2)
+    const textarea = content.children[0]!
+    expect(textarea.tagName).toBe("TEXTAREA")
+    expect(textarea.classList.contains("editor")).toBe(true)
+    const bar = content.children[1]!
+    expect(bar.matches("footer.status-bar")).toBe(true)
+    expect(bar.children[0]!.matches('[data-slot="status"]')).toBe(true)
+    expect(bar.children[1]!.matches('[data-slot="actions"]')).toBe(true)
+    expect(document.activeElement).toBe(textarea)
+  })
+
   it("shows empty text area and error banner with retry when initial load fails", async () => {
     let shouldFail = true
     const stored: Note[] = [{ id: 1, text: "Recovered after retry" }]

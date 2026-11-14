@@ -47,4 +47,23 @@ describe("ui building blocks", () => {
     expect(text.textContent).toBe("line one\n  indented")
     expect(panel(labelled, text).className).toBe("panel")
   })
+
+  it("makes the page behind the dialog inert and gives focus back", async () => {
+    document.body.innerHTML = '<main id="app"><textarea></textarea></main>'
+    const textarea = document.querySelector("textarea")!
+    textarea.focus()
+    const asked = confirmDialog("Sure?", "Yes")
+    expect(document.querySelector("#app")!.hasAttribute("inert")).toBe(true)
+    document.querySelector<HTMLButtonElement>(".dialog button")!.click()
+    await asked
+    expect(document.querySelector("#app")!.hasAttribute("inert")).toBe(false)
+    expect(document.activeElement).toBe(textarea)
+  })
+
+  it("works when there is no #app element", async () => {
+    document.body.innerHTML = ""
+    const asked = confirmDialog("Sure?", "Yes")
+    document.querySelectorAll<HTMLButtonElement>(".dialog button")[1]!.click()
+    expect(await asked).toBe(true)
+  })
 })

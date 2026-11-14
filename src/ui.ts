@@ -83,6 +83,8 @@ export const multilineText = (text: string): HTMLElement => {
  */
 export const confirmDialog = (message: string, confirmLabel: string): Promise<boolean> =>
   new Promise(resolve => {
+    const app = document.querySelector<HTMLElement>("#app")
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null
     const overlay = document.createElement("div")
     overlay.className = "dialog-overlay"
     const dialog = document.createElement("div")
@@ -95,6 +97,8 @@ export const confirmDialog = (message: string, confirmLabel: string): Promise<bo
     const finish = (answer: boolean) => {
       document.removeEventListener("keydown", onKey)
       overlay.remove()
+      app?.removeAttribute("inert")
+      previous?.focus()
       resolve(answer)
     }
     const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") finish(false) }
@@ -105,6 +109,7 @@ export const confirmDialog = (message: string, confirmLabel: string): Promise<bo
     dialog.append(text, actions)
     overlay.append(dialog)
     document.addEventListener("keydown", onKey)
+    app?.setAttribute("inert", "")
     document.body.append(overlay)
     cancel.focus()
   })

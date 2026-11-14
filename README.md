@@ -70,6 +70,22 @@ you know the window class (`hyprctl clients` while the app runs):
 
     o.window("^(scratch-pad|com\\.scratch\\.pad)$", { tag = "+floating-window" })
 
+## Theme
+
+Scratch Pad has no colours of its own. It reads the active Omarchy theme from
+`~/.config/omarchy/current/theme/colors.toml` and checks it once a second, so
+switching the Omarchy theme recolours an open window without a restart.
+
+- Only three keys are required, because they are the only ones every theme
+  defines: `background`, `foreground` and `accent`. Borders, dim text, the
+  dialog surface and the selection are mixed from them in `src/style.css`.
+- Used when present: `mode`, `selection_background` (or `selection`) together
+  with `selection_foreground`, and `red` (or `color1`) for error text.
+- Without an Omarchy theme the app uses the system light or dark colours.
+
+The Rust side is `src-tauri/src/platform/theme.rs` (one command, a fixed path,
+an allowlist of keys); the frontend side is `src/theme.ts`.
+
 ## Layout
 
 | Path | What it holds |

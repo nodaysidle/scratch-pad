@@ -73,6 +73,7 @@ Scratch Pad is a single-note app: the user types into one text area, the text is
 - CON-PERMISSION-FILESYSTEM: Use tauri-plugin-dialog only to let the user choose paths; Rust commands read and write only those chosen paths, including paths saved earlier to reopen, with std::fs after canonicalizing each existing path (for a save target that may not exist yet, its parent directory); the frontend gets no tauri-plugin-fs access.
 - CON-SECURITY-BOUNDARY: Minimize collected data and keep it inside the preset-defined owner, storage, and integration boundaries. Protect Note as personal data and never expose it through logs or diagnostics. Protect Markdown export file as personal data and never expose it through logs or diagnostics.
 - CON-PLATFORM-FILES: Read and write only paths the user chooses through the dialog; the app never scans a broad folder or keeps a copy of a user document.
+- CON-PLATFORM-THEME: One fixed exception to CON-PLATFORM-FILES: the app reads the active Omarchy theme palette at ~/.config/omarchy/current/theme/colors.toml through the theme_palette command. It is read-only, never written, and only an allowlist of colour keys with validated #rrggbb values (plus mode light or dark) reaches the frontend.
 
 ## Accessibility Boundary
 

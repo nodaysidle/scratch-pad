@@ -51,6 +51,7 @@ export const saveFeature = createSaveNoteAsMarkdownFileFeature({
   errors,
   store,
   saveDialog: opts => save(opts),
+  now: () => new Date(),
 })
 
 // Where a position in the note sits vertically, measured with an off-screen copy of the text

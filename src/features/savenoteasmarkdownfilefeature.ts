@@ -12,12 +12,34 @@ export interface SaveNoteAsMarkdownFileDeps {
   errors: ReturnType<typeof createErrorBanner>
   store: ReturnType<typeof createNoteStore>
   saveDialog: SaveDialogAdapter
+  /** Today's date goes into the suggested file name. */
+  now: () => Date
 }
 
 export interface SaveNoteAsMarkdownFileFeature {
   button: HTMLButtonElement
   status: HTMLParagraphElement
   saveMarkdown: () => Promise<void>
+}
+
+/**
+ * The file name the save dialog suggests: the note's first line with letters or digits, as a
+ * lowercase slug, then the date as dd-mm-yyyy. A note with no such line is called scratch-pad.
+ */
+export const exportFileName = (text: string, date: Date): string => {
+  const slugs = text.split("\n").map(line =>
+    line
+      .normalize("NFKD")
+      .replace(/[̀-ͯ]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 40)
+      .replace(/-+$/, ""),
+  )
+  const slug = slugs.find(Boolean) ?? "scratch-pad"
+  const two = (value: number): string => String(value).padStart(2, "0")
+  return `${slug}-${two(date.getDate())}-${two(date.getMonth() + 1)}-${date.getFullYear()}.md`
 }
 
 export const createSaveNoteAsMarkdownFileFeature = (
@@ -45,7 +67,7 @@ export const createSaveNoteAsMarkdownFileFeature = (
   const saveMarkdown = async (): Promise<void> => {
     statusElement.textContent = ""
     const chosenPath = await deps.saveDialog({
-      defaultPath: "scratch-pad.md",
+      defaultPath: exportFileName(deps.store.get().draft, deps.now()),
     })
     if (!chosenPath) return
     await performWrite(chosenPath)

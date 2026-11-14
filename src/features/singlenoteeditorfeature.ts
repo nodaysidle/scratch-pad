@@ -1,7 +1,6 @@
 import type { call as apiCall } from "../api"
 import type { createErrorBanner } from "../errors"
 import { createSlots, createStore } from "../store"
-import { panel } from "../ui"
 
 export interface Note {
   id: number
@@ -62,17 +61,17 @@ export const createSingleNoteEditorFeature = (
   actionsHost.className = "toolbar"
 
   const statusHost = activeSlots.host("status")
-  statusHost.style.marginBottom = "8px"
 
   const textarea = document.createElement("textarea")
+  textarea.className = "editor"
   textarea.setAttribute("aria-label", "Note")
+  textarea.spellcheck = false
   textarea.readOnly = true
-  textarea.rows = 16
-  textarea.style.width = "100%"
-  textarea.style.minHeight = "360px"
 
-  const editorPanel = panel(textarea)
-  host.replaceChildren(actionsHost, statusHost, editorPanel)
+  const statusBar = document.createElement("footer")
+  statusBar.className = "status-bar"
+  statusBar.append(statusHost, actionsHost)
+  host.replaceChildren(textarea, statusBar)
 
   deps.store.subscribe(() => {
     const currentDraft = deps.store.get().draft
@@ -94,6 +93,7 @@ export const createSingleNoteEditorFeature = (
       savedText = first?.text ?? ""
       loaded = true
       textarea.readOnly = false
+      textarea.focus()
       deps.store.set({ note: first ? [first] : [], draft: savedText, loadError: null })
       deps.errors.clear("The note could not be loaded.")
     } catch {

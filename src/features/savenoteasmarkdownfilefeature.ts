@@ -26,7 +26,6 @@ export const createSaveNoteAsMarkdownFileFeature = (
   const statusElement = document.createElement("p")
   statusElement.setAttribute("role", "status")
   statusElement.className = "muted"
-  statusElement.style.margin = "4px 0"
 
   const performWrite = async (path: string): Promise<void> => {
     const content = "# Scratch Pad\n\n" + deps.store.get().draft

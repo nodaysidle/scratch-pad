@@ -1,7 +1,8 @@
 /* Omarchy-native base. The app draws no chrome of its own: the compositor provides the window
    border, rounding and shadow. One monospace font (whatever the system maps "monospace" to).
    Every colour comes from --bg, --fg and --accent; the theme follower may override those three
-   (and --sel-bg, --sel-fg, --danger) on the root element. The values here are the fallback. */
+   (and --sel-bg, --sel-fg, --danger) on the root element. The values here are the fallback.
+   --font-size is set at runtime to the terminal's font size; 13px is the fallback. */
 :root {
   color-scheme: light dark;
   --bg: Canvas;
@@ -13,7 +14,7 @@
   --line: color-mix(in srgb, var(--fg) 25%, var(--bg));
   --sel-bg: color-mix(in srgb, var(--accent) 35%, var(--bg));
   --sel-fg: var(--fg);
-  font: 13px/1.5 monospace;
+  font: var(--font-size, 13px)/1.5 monospace;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -38,7 +39,7 @@ body { color: var(--fg); background: var(--bg); overflow: hidden; }
 
 .status-bar {
   display: flex; flex: 0 0 auto; align-items: center; gap: 8px;
-  padding: 4px 14px; color: var(--fg-dim); border-top: 1px solid var(--line); font-size: 12px;
+  padding: 4px 14px; color: var(--fg-dim); border-top: 1px solid var(--line); font-size: 0.92em;
 }
 .status-bar > [data-slot="status"] { flex: 1; min-width: 0; }
 .status-bar p { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -47,7 +48,7 @@ body { color: var(--fg); background: var(--bg); overflow: hidden; }
 
 .error-banner {
   display: flex; flex: 0 0 auto; align-items: center; gap: 12px;
-  padding: 6px 14px; color: var(--danger); border-bottom: 1px solid var(--danger); font-size: 12px;
+  padding: 6px 14px; color: var(--danger); border-bottom: 1px solid var(--danger); font-size: 0.92em;
 }
 .error-banner p { flex: 1; margin: 0; }
 .error-banner button { padding: 0; color: inherit; background: none; border: 0; font: inherit; font-weight: 700; cursor: pointer; }

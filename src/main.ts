@@ -3,6 +3,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window"
 import { call } from "./api"
 import { createCloseHandler } from "./close"
 import { createErrorBanner } from "./errors"
+import { followTerminalFont } from "./font"
 import { bindShortcuts } from "./shortcuts"
 import { followTheme } from "./theme"
 import { confirmDialog } from "./ui"
@@ -64,6 +65,12 @@ followTheme({
   call,
   root: document.documentElement,
   every: (fn, ms) => window.setInterval(fn, ms),
+})
+followTerminalFont({
+  call,
+  root: document.documentElement,
+  every: (fn, ms) => window.setInterval(fn, ms),
+  pixelRatio: () => window.devicePixelRatio,
 })
 
 try {

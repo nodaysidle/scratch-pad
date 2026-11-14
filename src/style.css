@@ -28,7 +28,7 @@
 html, body { height: 100%; margin: 0; }
 body { color: var(--fg); background: var(--bg); overflow: hidden; }
 #app { display: flex; flex-direction: column; height: 100%; }
-.app-content { display: flex; flex: 1; flex-direction: column; min-height: 0; }
+.app-content { position: relative; display: flex; flex: 1; flex-direction: column; min-height: 0; }
 
 /* The note fills the tile. 14px matches the stock terminal padding and clears rounded window corners. */
 .editor {
@@ -36,14 +36,40 @@ body { color: var(--fg); background: var(--bg); overflow: hidden; }
   color: var(--fg); background: var(--bg); caret-color: var(--accent);
   border: 0; outline: 0; resize: none; font: inherit;
 }
+.editor::placeholder { color: var(--fg-dim); }
+/* An off-screen copy of the note's text, used to measure where a match sits. */
+.editor-mirror {
+  position: absolute; visibility: hidden; flex: none; height: auto; min-height: 0;
+  white-space: pre-wrap; overflow-wrap: break-word; pointer-events: none;
+}
 
+/* The mode line: save state, cursor, word count on the left; the actions as key hints on the right. */
 .status-bar {
-  display: flex; flex: 0 0 auto; align-items: center; gap: 8px;
+  display: flex; flex: 0 0 auto; flex-wrap: wrap; align-items: center; gap: 2px 2ch;
   padding: 4px 14px; color: var(--fg-dim); border-top: 1px solid var(--line); font-size: 0.92em;
 }
-.status-bar > [data-slot="status"] { flex: 1; min-width: 0; }
-.status-bar p { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.toolbar { display: flex; flex: 0 0 auto; gap: 8px; }
+.status-bar > [data-slot="status"] { display: flex; flex: 1 1 auto; align-items: center; gap: 2ch; min-width: 0; }
+.status-bar p { flex: 1 1 0; min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.toolbar { display: flex; flex: 0 0 auto; gap: 1ch; }
+
+.mode-line { display: flex; flex: 0 0 auto; gap: 2ch; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.mode-line [data-state]::before { content: "\25CF"; margin-right: 1ch; color: var(--line); }
+.mode-line [data-state="unsaved"] { color: var(--fg); }
+.mode-line [data-state="unsaved"]::before { color: var(--accent); }
+/* Finding takes the mode line's place. */
+.status-bar:has(.find-bar:not([hidden])) .mode-line { display: none; }
+
+.find-bar { display: flex; flex: 0 1 auto; align-items: center; gap: 1ch; min-width: 0; white-space: nowrap; }
+.find-bar input {
+  width: 24ch; min-width: 8ch; padding: 2px 6px; color: var(--fg); background: var(--bg-raised);
+  border: 1px solid var(--line); border-radius: 0; outline: 0; font: inherit;
+}
+.find-bar input:focus-visible { border-color: var(--accent); }
+
+/* In the mode line the actions are key hints, not boxes. */
+.status-bar .button { height: auto; padding: 2px 6px; color: var(--fg-dim); border-color: transparent; }
+.status-bar .button:hover:not(:disabled) { color: var(--fg); }
+.button[data-key]::before { content: attr(data-key); margin-right: 1ch; color: var(--fg); }
 .muted { color: var(--fg-dim); }
 
 .error-banner {

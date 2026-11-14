@@ -7,6 +7,8 @@ import { followTerminalFont } from "./font"
 import { bindShortcuts } from "./shortcuts"
 import { followTheme } from "./theme"
 import { confirmDialog } from "./ui"
+import { createFindFeature } from "./features/findfeature"
+import { createModeLineFeature } from "./features/modelinefeature"
 import { createOpenPlainTextFileToReplaceNoteFeature } from "./features/openplaintextfiletoreplacenotefeature"
 import { createSaveNoteAsMarkdownFileFeature } from "./features/savenoteasmarkdownfilefeature"
 import {
@@ -51,14 +53,33 @@ export const saveFeature = createSaveNoteAsMarkdownFileFeature({
   saveDialog: opts => save(opts),
 })
 
+// Where a position in the note sits vertically, measured with an off-screen copy of the text
+// (a textarea cannot report the position of a character).
+const reveal = (index: number): void => {
+  const mirror = document.createElement("div")
+  mirror.className = "editor editor-mirror"
+  mirror.style.width = `${editor.textarea.clientWidth}px`
+  mirror.textContent = editor.textarea.value.slice(0, index)
+  editor.textarea.after(mirror)
+  const top = mirror.offsetHeight
+  mirror.remove()
+  editor.textarea.scrollTop = Math.max(0, top - editor.textarea.clientHeight / 2)
+}
+
+const modeLine = createModeLineFeature({ store, textarea: editor.textarea })
+const find = createFindFeature({ textarea: editor.textarea, reveal })
+
 slots.mount("actions", openFeature.button, saveFeature.button)
-slots.mount("status", saveFeature.status)
+slots.mount("status", modeLine.element, find.element, saveFeature.status)
 
 openFeature.button.title = "Ctrl+O"
+openFeature.button.dataset.key = "^O"
 saveFeature.button.title = "Ctrl+S"
+saveFeature.button.dataset.key = "^S"
 bindShortcuts(document, {
   open: () => void openFeature.openFile(),
   save: () => void saveFeature.saveMarkdown(),
+  find: find.open,
 })
 
 followTheme({

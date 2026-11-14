@@ -6,7 +6,7 @@ with Omarchy (Hyprland on Wayland).
 
 - The note is saved one second after you stop typing, and again when the window closes.
 - **Open text file** replaces the note with a plain-text file, after a confirmation.
-- **Save as Markdown** exports the note as a `.md` file.
+- **Save as Markdown** exports the note as a `.md` file. The suggested name is the note's first line and the date, for example `apikeys-14-11-2026.md`.
 - Nothing leaves the device. There is no network access.
 
 The note lives in `~/.local/share/com.scratch.pad/records.sqlite3`.

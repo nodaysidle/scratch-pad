@@ -30,7 +30,7 @@ export const exportFileName = (text: string, date: Date): string => {
   const slugs = text.split("\n").map(line =>
     line
       .normalize("NFKD")
-      .replace(/[̀-ͯ]/g, "")
+      .replace(/[\u0300-\u036f]/g, "")
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "")
       .slice(0, 40),

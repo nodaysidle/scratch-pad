@@ -17,12 +17,7 @@ import {
 const root = document.querySelector<HTMLElement>("#app")
 if (!root) throw new Error("#app is missing from index.html")
 
-root.innerHTML = `
-  <header class="app-header">
-    <h1>Scratch Pad</h1>
-  </header>
-  <section class="app-content" aria-label="Scratch Pad"></section>
-`
+root.innerHTML = `<section class="app-content" aria-label="Scratch Pad"></section>`
 
 export const errors = createErrorBanner(root)
 

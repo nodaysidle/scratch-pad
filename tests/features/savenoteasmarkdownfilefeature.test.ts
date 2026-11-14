@@ -191,35 +191,37 @@ describe("exportFileName", () => {
     expect(exportFileName("apikeys", d)).toBe("apikeys-14-11-2026.md")
   })
 
-  it("drops Markdown heading marks and lowercases", () => {
-    expect(exportFileName("# API keys\nsecond line", d)).toBe("api-keys-14-11-2026.md")
+  it("drops Markdown heading marks, lowercases and joins the words", () => {
+    expect(exportFileName("# API keys\nsecond line", d)).toBe("apikeys-14-11-2026.md")
   })
 
   it("skips blank lines and removes accents", () => {
     expect(exportFileName("\n   \nKljuči za strežnik!\nmore", d)).toBe(
-      "kljuci-za-streznik-14-11-2026.md",
+      "kljucizastreznik-14-11-2026.md",
     )
   })
 
   it("skips a line with no letters or digits", () => {
-    expect(exportFileName("---\nTODO: call Ana @ 5pm", d)).toBe("todo-call-ana-5pm-14-11-2026.md")
+    expect(exportFileName("---\nTODO: call Ana @ 5pm", d)).toBe("todocallana5pm-14-11-2026.md")
   })
 
-  it("falls back to scratch-pad when no line is usable", () => {
-    expect(exportFileName("", d)).toBe("scratch-pad-14-11-2026.md")
-    expect(exportFileName("!!!\n   \n***", d)).toBe("scratch-pad-14-11-2026.md")
+  it("falls back to scratchpad when no line is usable", () => {
+    expect(exportFileName("", d)).toBe("scratchpad-14-11-2026.md")
+    expect(exportFileName("!!!\n   \n***", d)).toBe("scratchpad-14-11-2026.md")
   })
 
-  it("cuts the slug to 40 characters and drops a hyphen left at the cut", () => {
+  it("joins the words first, then cuts the slug to 40 characters", () => {
     expect(exportFileName("a".repeat(60), d)).toBe("a".repeat(40) + "-14-11-2026.md")
-    expect(exportFileName("a".repeat(39) + " bcd", d)).toBe("a".repeat(39) + "-14-11-2026.md")
+    expect(exportFileName("a".repeat(39) + " bcd", d)).toBe("a".repeat(39) + "b-14-11-2026.md")
   })
 
   it("zero-pads the day and month", () => {
     expect(exportFileName("x", new Date(2027, 0, 5))).toBe("x-05-01-2027.md")
   })
 
-  it("never contains a slash, a space or an upper-case letter", () => {
-    expect(exportFileName("My Notes / Drafts\\ v2", d)).toBe("my-notes-drafts-v2-14-11-2026.md")
+  it("never contains a slash, a space, an upper-case letter or a hyphen outside the date", () => {
+    const name = exportFileName("My Notes / Drafts\\ v2", d)
+    expect(name).toBe("mynotesdraftsv2-14-11-2026.md")
+    expect(name.split("-").length - 1).toBe(3)
   })
 })

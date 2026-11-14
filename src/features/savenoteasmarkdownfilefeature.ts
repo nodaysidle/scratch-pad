@@ -23,8 +23,8 @@ export interface SaveNoteAsMarkdownFileFeature {
 }
 
 /**
- * The file name the save dialog suggests: the note's first line with letters or digits, as a
- * lowercase slug, then the date as dd-mm-yyyy. A note with no such line is called scratch-pad.
+ * The file name the save dialog suggests: the note's first line with letters or digits, lowercased
+ * with its words joined, then the date as dd-mm-yyyy. A note with no such line is called scratchpad.
  */
 export const exportFileName = (text: string, date: Date): string => {
   const slugs = text.split("\n").map(line =>
@@ -32,12 +32,10 @@ export const exportFileName = (text: string, date: Date): string => {
       .normalize("NFKD")
       .replace(/[̀-ͯ]/g, "")
       .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 40)
-      .replace(/-+$/, ""),
+      .replace(/[^a-z0-9]+/g, "")
+      .slice(0, 40),
   )
-  const slug = slugs.find(Boolean) ?? "scratch-pad"
+  const slug = slugs.find(Boolean) ?? "scratchpad"
   const two = (value: number): string => String(value).padStart(2, "0")
   return `${slug}-${two(date.getDate())}-${two(date.getMonth() + 1)}-${date.getFullYear()}.md`
 }

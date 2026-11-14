@@ -3,6 +3,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window"
 import { call } from "./api"
 import { createCloseHandler } from "./close"
 import { createErrorBanner } from "./errors"
+import { bindShortcuts } from "./shortcuts"
 import { confirmDialog } from "./ui"
 import { createOpenPlainTextFileToReplaceNoteFeature } from "./features/openplaintextfiletoreplacenotefeature"
 import { createSaveNoteAsMarkdownFileFeature } from "./features/savenoteasmarkdownfilefeature"
@@ -50,6 +51,13 @@ export const saveFeature = createSaveNoteAsMarkdownFileFeature({
 
 slots.mount("actions", openFeature.button, saveFeature.button)
 slots.mount("status", saveFeature.status)
+
+openFeature.button.title = "Ctrl+O"
+saveFeature.button.title = "Ctrl+S"
+bindShortcuts(document, {
+  open: () => void openFeature.openFile(),
+  save: () => void saveFeature.saveMarkdown(),
+})
 
 try {
   void getCurrentWindow().onCloseRequested(

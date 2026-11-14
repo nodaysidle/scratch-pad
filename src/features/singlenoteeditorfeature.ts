@@ -45,7 +45,8 @@ export interface SingleNoteEditorDeps {
 export interface SingleNoteEditor {
   setDraft: (text: string) => void
   replaceNote: (text: string) => Promise<boolean>
-  flush: () => Promise<void>
+  /** Writes any unsaved text now. Resolves true when nothing is left unsaved. */
+  flush: () => Promise<boolean>
 }
 
 export const createSingleNoteEditorFeature = (
@@ -65,6 +66,7 @@ export const createSingleNoteEditorFeature = (
 
   const textarea = document.createElement("textarea")
   textarea.setAttribute("aria-label", "Note")
+  textarea.readOnly = true
   textarea.rows = 16
   textarea.style.width = "100%"
   textarea.style.minHeight = "360px"
@@ -80,53 +82,44 @@ export const createSingleNoteEditorFeature = (
   })
 
   let pendingTimer: number | null = null
-  let hasUserEdited = false
+  // Nothing may be saved before the stored note is known: a save without it would create a second note.
+  let loaded = false
+  let savedText = ""
   let writeChain: Promise<void> = Promise.resolve()
 
   const reload = async (): Promise<void> => {
     try {
       const records = await deps.call<Note[]>("list_note")
       const first = records[0]
-      if (hasUserEdited) {
-        deps.store.set({
-          note: first ? [first] : [],
-          loadError: null,
-        })
-      } else {
-        deps.store.set({
-          note: first ? [first] : [],
-          draft: first?.text ?? "",
-          loadError: null,
-        })
-      }
+      savedText = first?.text ?? ""
+      loaded = true
+      textarea.readOnly = false
+      deps.store.set({ note: first ? [first] : [], draft: savedText, loadError: null })
+      deps.errors.clear("The note could not be loaded.")
     } catch {
-      deps.store.set({
-        note: [],
-        draft: hasUserEdited ? deps.store.get().draft : "",
-        loadError: "The note could not be loaded.",
-      })
-      deps.errors.show("The note could not be loaded.", () => {
-        void reload()
-      })
+      deps.store.set({ note: [], draft: "", loadError: "The note could not be loaded." })
+      deps.errors.show("The note could not be loaded.", retryLoad)
     }
+  }
+
+  const retryLoad = (): void => {
+    writeChain = writeChain.then(reload)
   }
 
   writeChain = reload()
 
   const saveDraft = (): Promise<boolean> => {
     const next = writeChain.then(async () => {
+      if (!loaded) return false
       const text = deps.store.get().draft
       const existing = deps.store.get().note[0]
       try {
         const saved = existing
-          ? await deps.call<Note>("update_note", {
-              id: existing.id,
-              input: { ...existing, text },
-            })
-          : await deps.call<Note>("create_note", {
-              input: { text },
-            })
+          ? await deps.call<Note>("update_note", { id: existing.id, input: { ...existing, text } })
+          : await deps.call<Note>("create_note", { input: { text } })
+        savedText = text
         deps.store.set({ note: [saved] })
+        deps.errors.clear("The note could not be saved.")
         return true
       } catch {
         deps.errors.show("The note could not be saved.", () => {
@@ -143,7 +136,7 @@ export const createSingleNoteEditorFeature = (
   }
 
   const setDraft = (text: string): void => {
-    hasUserEdited = true
+    if (!loaded) return
     deps.store.set({ draft: text })
     if (pendingTimer !== null) {
       deps.timers.clear(pendingTimer)
@@ -155,7 +148,10 @@ export const createSingleNoteEditorFeature = (
   }
 
   const replaceNote = (text: string): Promise<boolean> => {
-    hasUserEdited = true
+    if (!loaded) {
+      deps.errors.show("The note could not be loaded.", retryLoad)
+      return Promise.resolve(false)
+    }
     if (pendingTimer !== null) {
       deps.timers.clear(pendingTimer)
       pendingTimer = null
@@ -164,14 +160,14 @@ export const createSingleNoteEditorFeature = (
     return saveDraft()
   }
 
-  const flush = async (): Promise<void> => {
+  const flush = async (): Promise<boolean> => {
     if (pendingTimer !== null) {
       deps.timers.clear(pendingTimer)
       pendingTimer = null
-      await saveDraft()
-      return
     }
     await writeChain
+    if (!loaded || deps.store.get().draft === savedText) return true
+    return saveDraft()
   }
 
   textarea.addEventListener("input", () => {

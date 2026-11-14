@@ -12,11 +12,11 @@ done (unless a reviewer dispatched you and maintains this index).
 | 001 | Baseline: `.gitignore`, `npm run check`, real README | P1 | S | — | DONE (reviewed; branch `advisor/001-baseline` at `a476bdc`, merged) |
 | 002 | Data safety: close, failed load, stale Retry | P1 | M | — | DONE (reviewed; branch `advisor/002-data-safety` at `f37c924`, merged) |
 | 003 | Tiling-native redesign (layout, font, chrome, keyboard) | P1 | M | 001, 002 | DONE (reviewed + launch check; branch `advisor/003-tiling-native-redesign` at `903918b`, includes 001 and 002, merged) |
+| 004 | Follow the active Omarchy theme, live | P1 | M | 003 | DONE (reviewed + live theme check; branch `advisor/004-follow-omarchy-theme` at `af9d1ba`, includes 001-003, merged) |
 | 005 | Terminal font size: read it and follow it | P1 | S | — | DONE (reviewed; measured 16.0px = Ghostty 12pt; branch `advisor/005-terminal-font-size` at `39e34e6`, merged) |
 | 006 | Mode line and find in note | P2 | M | 005 | DONE (reviewed + driven in offscreen WebKit; branch `advisor/006-mode-line-and-find` at `8c2b018`, includes 005, merged) |
-| 008 | Export file name from the note and the date (words joined, `apikeys-14-11-2026.md`) | P2 | S | — | DONE (reviewed after two revision rounds; merged, `master` at `5781cf3`; installed) |
 | 007 | App icon and `--install-binary` (launcher entry named `scratch-pad`) | P2 | S | — | DONE (reviewed; merged) |
-| 004 | Follow the active Omarchy theme, live | P1 | M | 003 | DONE (reviewed + live theme check; branch `advisor/004-follow-omarchy-theme` at `af9d1ba`, includes 001-003, merged) |
+| 008 | Export file name from the note and the date (words joined, `apikeys-14-11-2026.md`) | P2 | S | — | DONE (reviewed after two revision rounds; merged, `master` at `5781cf3`; installed) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale — finding fixed independently or approach abandoned)
 
@@ -84,7 +84,7 @@ owner's real note and desktop theme are never touched:
 ## To ship
 
 `advisor/004-follow-omarchy-theme` (`af9d1ba`) contains all four plans. Merging it into `master` and installing
-the build are the owner's decisions; nothing has been merged or installed.
+the build were the owner's decisions; both were done later the same day (see the sections below).
 
 ## Merged and installed (2026-11-14, on the owner's instruction)
 

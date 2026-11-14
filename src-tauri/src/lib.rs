@@ -54,6 +54,7 @@ pub fn app_builder<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> 
         platform::datastore::read_text_file,
         platform::datastore::write_markdown_export_file,
         platform::theme::theme_palette,
+        platform::font::terminal_font,
     ])
 }
 

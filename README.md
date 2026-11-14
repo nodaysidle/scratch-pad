@@ -43,7 +43,9 @@ them again.
 |---|---|
 | `Ctrl+O` | Open text file (replaces the note after a confirmation) |
 | `Ctrl+S` | Save as Markdown |
-| `Esc` | Cancel the confirmation |
+| `Ctrl+F` | Find in the note |
+| `Enter` / `Shift+Enter` | Next / previous match, while the find field is shown |
+| `Esc` | Close the find field, or cancel the confirmation |
 
 The note has focus at launch. Closing is left to the window manager
 (`SUPER+W` on Omarchy).
@@ -61,6 +63,9 @@ whatever tile it is given and draws no chrome of its own.
   never as a fill behind text.
 - Controls are 28px high with a 1px border and square corners. No animations.
 - Minimum window size is 360x200; the layout must work at that size.
+- The bottom line is a mode line, as in a terminal editor: save state, cursor
+  position (`line:column`), word count, then the actions as key hints (`^O`, `^S`).
+  Finding (`Ctrl+F`) takes its place while active.
 
 These rules replace the look described in `kit/README.md` ("system font",
 "no task edits src/style.css"), which applied to the original build only.

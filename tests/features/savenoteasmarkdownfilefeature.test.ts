@@ -2,7 +2,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { createErrorBanner } from "../../src/errors"
 import { createNoteStore } from "../../src/features/singlenoteeditorfeature"
-import { createSaveNoteAsMarkdownFileFeature } from "../../src/features/savenoteasmarkdownfilefeature"
+import {
+  createSaveNoteAsMarkdownFileFeature,
+  exportFileName,
+} from "../../src/features/savenoteasmarkdownfilefeature"
+
+const now = () => new Date(2026, 10, 14)
 
 const flushMicrotasks = async () => {
   for (let i = 0; i < 6; i++) {
@@ -33,6 +38,7 @@ describe("SaveNoteAsMarkdownFileFeature", () => {
       call,
       errors,
       store,
+      now,
       saveDialog: vi.fn().mockResolvedValue(null),
     })
 
@@ -58,6 +64,7 @@ describe("SaveNoteAsMarkdownFileFeature", () => {
       },
       errors,
       store,
+      now,
       saveDialog: vi.fn().mockResolvedValue("/path/to/scratch-pad.md"),
     })
 
@@ -87,8 +94,9 @@ describe("SaveNoteAsMarkdownFileFeature", () => {
       },
       errors,
       store,
+      now,
       saveDialog: vi.fn().mockImplementation(async (opts: { defaultPath: string }) => {
-        expect(opts.defaultPath).toBe("scratch-pad.md")
+        expect(opts.defaultPath).toBe("hello-14-11-2026.md")
         return "/path/to/my-note.md"
       }),
     })
@@ -120,6 +128,7 @@ describe("SaveNoteAsMarkdownFileFeature", () => {
       },
       errors,
       store,
+      now,
       saveDialog: vi.fn().mockResolvedValue("/path/to/fail.md"),
     })
 
@@ -154,6 +163,7 @@ describe("SaveNoteAsMarkdownFileFeature", () => {
       },
       errors,
       store,
+      now,
       saveDialog: vi.fn().mockResolvedValue("/path/to/fail.md"),
     })
 
@@ -171,5 +181,45 @@ describe("SaveNoteAsMarkdownFileFeature", () => {
       path: "/path/to/fail.md",
       content: "# Scratch Pad\n\nHello again",
     })
+  })
+})
+
+describe("exportFileName", () => {
+  const d = new Date(2026, 10, 14)
+
+  it("uses a plain first line as the slug", () => {
+    expect(exportFileName("apikeys", d)).toBe("apikeys-14-11-2026.md")
+  })
+
+  it("drops Markdown heading marks and lowercases", () => {
+    expect(exportFileName("# API keys\nsecond line", d)).toBe("api-keys-14-11-2026.md")
+  })
+
+  it("skips blank lines and removes accents", () => {
+    expect(exportFileName("\n   \nKljuči za strežnik!\nmore", d)).toBe(
+      "kljuci-za-streznik-14-11-2026.md",
+    )
+  })
+
+  it("skips a line with no letters or digits", () => {
+    expect(exportFileName("---\nTODO: call Ana @ 5pm", d)).toBe("todo-call-ana-5pm-14-11-2026.md")
+  })
+
+  it("falls back to scratch-pad when no line is usable", () => {
+    expect(exportFileName("", d)).toBe("scratch-pad-14-11-2026.md")
+    expect(exportFileName("!!!\n   \n***", d)).toBe("scratch-pad-14-11-2026.md")
+  })
+
+  it("cuts the slug to 40 characters and drops a hyphen left at the cut", () => {
+    expect(exportFileName("a".repeat(60), d)).toBe("a".repeat(40) + "-14-11-2026.md")
+    expect(exportFileName("a".repeat(39) + " bcd", d)).toBe("a".repeat(39) + "-14-11-2026.md")
+  })
+
+  it("zero-pads the day and month", () => {
+    expect(exportFileName("x", new Date(2027, 0, 5))).toBe("x-05-01-2027.md")
+  })
+
+  it("never contains a slash, a space or an upper-case letter", () => {
+    expect(exportFileName("My Notes / Drafts\\ v2", d)).toBe("my-notes-drafts-v2-14-11-2026.md")
   })
 })

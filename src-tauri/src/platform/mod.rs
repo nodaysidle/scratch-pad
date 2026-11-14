@@ -3,3 +3,4 @@ pub mod datastore;
 pub mod lifecyclecoordinator;
 pub mod packaging;
 pub mod permissioncoordinator;
+pub mod theme;

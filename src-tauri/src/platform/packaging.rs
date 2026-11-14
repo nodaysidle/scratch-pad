@@ -24,6 +24,7 @@ pub fn verify_runtime_wiring(manifest_dir: &Path) -> Vec<String> {
         "update_note",
         "read_text_file",
         "write_markdown_export_file",
+        "theme_palette",
     ];
     for cmd in commands {
         if !lib_rs.contains(cmd) {

@@ -9,7 +9,7 @@ const press = (key: string, init: KeyboardEventInit = {}): KeyboardEvent => {
 }
 
 const setup = () => {
-  const actions = { open: vi.fn(), save: vi.fn() }
+  const actions = { open: vi.fn(), save: vi.fn(), find: vi.fn() }
   bindShortcuts(document, actions)
   return actions
 }
@@ -19,6 +19,15 @@ describe("bindShortcuts", () => {
     const actions = setup()
     const event = press("o", { ctrlKey: true })
     expect(actions.open).toHaveBeenCalledTimes(1)
+    expect(actions.save).not.toHaveBeenCalled()
+    expect(event.defaultPrevented).toBe(true)
+  })
+
+  it("Ctrl+F opens find and prevents the default", () => {
+    const actions = setup()
+    const event = press("f", { ctrlKey: true })
+    expect(actions.find).toHaveBeenCalledTimes(1)
+    expect(actions.open).not.toHaveBeenCalled()
     expect(actions.save).not.toHaveBeenCalled()
     expect(event.defaultPrevented).toBe(true)
   })

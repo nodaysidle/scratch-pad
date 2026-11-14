@@ -1,6 +1,7 @@
 import { open, save } from "@tauri-apps/plugin-dialog"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 import { call } from "./api"
+import { createCloseHandler } from "./close"
 import { createErrorBanner } from "./errors"
 import { confirmDialog } from "./ui"
 import { createOpenPlainTextFileToReplaceNoteFeature } from "./features/openplaintextfiletoreplacenotefeature"
@@ -56,9 +57,9 @@ slots.mount("actions", openFeature.button, saveFeature.button)
 slots.mount("status", saveFeature.status)
 
 try {
-  void getCurrentWindow().onCloseRequested(async () => {
-    await editor.flush()
-  })
+  void getCurrentWindow().onCloseRequested(
+    createCloseHandler({ flush: editor.flush, confirm: confirmDialog }),
+  )
 } catch {
   // Outside a Tauri window runtime (such as unit tests), window close events are unavailable.
 }

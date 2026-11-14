@@ -28,15 +28,17 @@ export const createSaveNoteAsMarkdownFileFeature = (
   statusElement.className = "muted"
   statusElement.style.margin = "4px 0"
 
-  const performWrite = async (path: string, content: string): Promise<void> => {
+  const performWrite = async (path: string): Promise<void> => {
+    const content = "# Scratch Pad\n\n" + deps.store.get().draft
     try {
       await deps.call("write_markdown_export_file", { path, content })
       statusElement.textContent = "The file was saved."
+      deps.errors.clear("The file could not be saved.")
     } catch {
       statusElement.textContent = ""
       deps.errors.show("The file could not be saved.", () => {
         statusElement.textContent = ""
-        void performWrite(path, content)
+        void performWrite(path)
       })
     }
   }
@@ -47,9 +49,7 @@ export const createSaveNoteAsMarkdownFileFeature = (
       defaultPath: "scratch-pad.md",
     })
     if (!chosenPath) return
-
-    const content = "# Scratch Pad\n\n" + deps.store.get().draft
-    await performWrite(chosenPath, content)
+    await performWrite(chosenPath)
   }
 
   const actionButton = button("Save as Markdown", () => {

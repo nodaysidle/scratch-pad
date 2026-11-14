@@ -139,4 +139,37 @@ describe("SaveNoteAsMarkdownFileFeature", () => {
     expect(feature.status.textContent).toBe("The file was saved.")
     expect(callArgs.length).toBe(2)
   })
+  it("a retry exports the current text", async () => {
+    const store = createNoteStore()
+    store.set({ note: [{ id: 1, text: "Hello" }], draft: "Hello" })
+    const errors = createErrorBanner(root)
+    let shouldFail = true
+    const callArgs: Array<{ cmd: string; args: unknown }> = []
+
+    const feature = createSaveNoteAsMarkdownFileFeature({
+      call: async <T>(cmd: string, args?: Record<string, unknown>): Promise<T> => {
+        callArgs.push({ cmd, args })
+        if (shouldFail) throw { kind: "storage", message: "disk error" }
+        return undefined as unknown as T
+      },
+      errors,
+      store,
+      saveDialog: vi.fn().mockResolvedValue("/path/to/fail.md"),
+    })
+
+    await feature.saveMarkdown()
+    await flushMicrotasks()
+
+    store.set({ draft: "Hello again" })
+    shouldFail = false
+    const banner = document.querySelector<HTMLElement>(".error-banner")!
+    const retryBtn = [...banner.querySelectorAll("button")].find(b => b.textContent === "Retry")!
+    retryBtn.click()
+    await flushMicrotasks()
+
+    expect(callArgs[1]?.args).toEqual({
+      path: "/path/to/fail.md",
+      content: "# Scratch Pad\n\nHello again",
+    })
+  })
 })

@@ -26,12 +26,17 @@ export interface OpenPlainTextFileFeature {
 export const createOpenPlainTextFileToReplaceNoteFeature = (
   deps: OpenPlainTextFileDeps,
 ): OpenPlainTextFileFeature => {
+  const question = "Replace the current note with the contents of this file?"
+
   const readAndReplace = async (path: string): Promise<void> => {
     try {
       const text = await deps.call<string>("read_text_file", { path })
       await deps.editor.replaceNote(text)
     } catch {
-      deps.errors.show("The file could not be opened.", () => {
+      const draftAtFailure = deps.store.get().draft
+      deps.errors.show("The file could not be opened.", async () => {
+        // The user confirmed replacing the note as it was then; text typed since needs a new yes.
+        if (deps.store.get().draft !== draftAtFailure && !(await deps.confirm(question, "Replace"))) return
         void readAndReplace(path)
       })
     }
@@ -43,10 +48,7 @@ export const createOpenPlainTextFileToReplaceNoteFeature = (
     const chosenPath = Array.isArray(selected) ? selected[0] : selected
     if (!chosenPath) return
 
-    const confirmed = await deps.confirm(
-      "Replace the current note with the contents of this file?",
-      "Replace",
-    )
+    const confirmed = await deps.confirm(question, "Replace")
     if (!confirmed) return
 
     await readAndReplace(chosenPath)

@@ -175,4 +175,47 @@ describe("OpenPlainTextFileToReplaceNoteFeature", () => {
     expect(confirm).toHaveBeenCalledTimes(1)
     expect(replaceNote).toHaveBeenCalledWith("Recovered content")
   })
+  it("asks again before a retry replaces text typed after the failure", async () => {
+    const store = createNoteStore()
+    store.set({ note: [{ id: 1, text: "Original note" }], draft: "Original note" })
+    const errors = createErrorBanner(root)
+    const replaceNote = vi.fn().mockResolvedValue(true)
+    const editor: SingleNoteEditor = {
+      setDraft: vi.fn(),
+      replaceNote,
+      flush: vi.fn().mockResolvedValue(true),
+    }
+    const confirm = vi.fn().mockResolvedValue(true)
+    let failRead = true
+
+    const feature = createOpenPlainTextFileToReplaceNoteFeature({
+      call: async <T>(cmd: string): Promise<T> => {
+        if (cmd === "read_text_file") {
+          if (failRead) throw { kind: "invalid", message: "invalid utf8" }
+          return "Recovered content" as unknown as T
+        }
+        throw new Error(`unexpected ${cmd}`)
+      },
+      errors,
+      store,
+      editor,
+      confirm,
+      openDialog: vi.fn().mockResolvedValue("/bad/file.txt"),
+    })
+
+    await feature.openFile()
+    await flushMicrotasks()
+    expect(confirm).toHaveBeenCalledTimes(1)
+
+    store.set({ draft: "Typed after the failure" })
+    confirm.mockResolvedValueOnce(false)
+    failRead = false
+    const banner = document.querySelector<HTMLElement>(".error-banner")!
+    const retryBtn = [...banner.querySelectorAll("button")].find(b => b.textContent === "Retry")!
+    retryBtn.click()
+    await flushMicrotasks()
+
+    expect(confirm).toHaveBeenCalledTimes(2)
+    expect(replaceNote).not.toHaveBeenCalled()
+  })
 })

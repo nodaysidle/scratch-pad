@@ -37,9 +37,12 @@ This builds the release binary and installs it for the current user:
 - the icon `~/.local/share/icons/hicolor/scalable/apps/scratch-pad.svg`;
 - the launcher entry `~/.local/share/applications/scratch-pad.desktop`.
 
-The binary, the entry, the icon and the window class are all named
-`scratch-pad`, so the app appears in the Omarchy launcher (`Super + Space`)
-with its icon. Use `scratch-pad` as the class in Hyprland window rules.
+The binary, the launcher entry (`scratch-pad.desktop`), the icon and the window
+class are all named `scratch-pad`, so the app appears in the Omarchy launcher
+(`Super + Space`) with its icon. Launching `scratch-pad` or
+`scratch-pad.desktop` while it is already running focuses the existing window
+instead of opening a second instance. Use `scratch-pad` as the class in
+Hyprland window rules.
 
 The app can also be packaged as an AppImage:
 
@@ -59,8 +62,11 @@ the two local fixes it needs.
 | `Ctrl+O` | Open text file (replaces the note after a confirmation) |
 | `Ctrl+S` | Save as Markdown |
 | `Ctrl+F` | Find in the note |
+| `Ctrl+Shift+C` | Copy entire note when nothing is selected |
+| `Tab` / `Shift+Tab` | Indent / outdent current line or selected lines |
+| `F6` | Toggle focus between the note and the mode line |
 | `Enter` / `Shift+Enter` | Next / previous match, while the find field is shown |
-| `Esc` | Close the find field, or cancel the confirmation |
+| `Esc` | Close the find field, cancel the confirmation, or dismiss an error banner |
 
 The note has focus at launch. Closing is left to the window manager
 (`SUPER+W` on Omarchy).
@@ -79,16 +85,23 @@ whatever tile it is given and draws no chrome of its own.
 - Controls are 28px high with a 1px border and square corners. No animations.
 - Minimum window size is 360x200; the layout must work at that size.
 - The bottom line is a mode line, as in a terminal editor: save state, cursor
-  position (`line:column`), word count, then the actions as key hints (`^O`, `^S`).
+  position (`line:column`), word count, then the actions as key hints (`^F`, `^O`, `^S`).
   Finding (`Ctrl+F`) takes its place while active.
 
 These rules replace the look described in `kit/README.md` ("system font",
 "no task edits src/style.css"), which applied to the original build only.
 
-To float it as a scratchpad, add a rule to `~/.config/hypr/hyprland.lua` once
-you know the window class (`hyprctl clients` while the app runs):
+In Omarchy 4.5 (`~/.config/hypr/hyprland.lua`), keep the note opaque with:
 
-    o.window("^(scratch-pad|com\\.scratch\\.pad)$", { tag = "+floating-window" })
+```lua
+o.window({ class = "scratch-pad" }, { tag = "-default-opacity", opacity = "1.0 1.0" })
+```
+
+To optionally float it as a scratchpad as well:
+
+```lua
+o.window({ class = "scratch-pad" }, { tag = "+floating-window" })
+```
 
 ## Theme
 

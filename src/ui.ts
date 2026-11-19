@@ -77,6 +77,9 @@ export const multilineText = (text: string): HTMLElement => {
   return element
 }
 
+let openDialogs = 0
+let dialogSeq = 0
+
 /**
  * A confirmation inside the page (no browser or plugin dialog): a modal with the message, a Cancel
  * button, and a confirm button labelled confirmLabel. Resolves true on confirm, false on Cancel or Escape.
@@ -91,24 +94,52 @@ export const confirmDialog = (message: string, confirmLabel: string): Promise<bo
     dialog.className = "dialog"
     dialog.setAttribute("role", "alertdialog")
     dialog.setAttribute("aria-modal", "true")
-    dialog.setAttribute("aria-label", message)
+    const messageId = `dialog-msg-${++dialogSeq}`
+    dialog.setAttribute("aria-labelledby", messageId)
     const text = document.createElement("p")
+    text.id = messageId
     text.textContent = message
+    let settled = false
     const finish = (answer: boolean) => {
+      if (settled) return
+      settled = true
       document.removeEventListener("keydown", onKey)
       overlay.remove()
-      app?.removeAttribute("inert")
+      openDialogs = Math.max(0, openDialogs - 1)
+      if (openDialogs === 0) {
+        app?.removeAttribute("inert")
+      }
       previous?.focus()
       resolve(answer)
     }
-    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") finish(false) }
     const actions = document.createElement("div")
     actions.className = "dialog-actions"
     const cancel = button("Cancel", () => finish(false))
-    actions.append(cancel, button(confirmLabel, () => finish(true), { primary: true }))
+    const confirm = button(confirmLabel, () => finish(true), { primary: true })
+    const onKey = (event: KeyboardEvent) => {
+      const overlays = document.querySelectorAll(".dialog-overlay")
+      if (overlays[overlays.length - 1] !== overlay) return
+      if (event.key === "Escape") {
+        finish(false)
+        return
+      }
+      if (event.key === "Tab") {
+        event.preventDefault()
+        if (document.activeElement === cancel) {
+          confirm.focus()
+        } else {
+          cancel.focus()
+        }
+      }
+    }
+    overlay.addEventListener("click", event => {
+      if (event.target === overlay) finish(false)
+    })
+    actions.append(cancel, confirm)
     dialog.append(text, actions)
     overlay.append(dialog)
     document.addEventListener("keydown", onKey)
+    openDialogs += 1
     app?.setAttribute("inert", "")
     document.body.append(overlay)
     cancel.focus()

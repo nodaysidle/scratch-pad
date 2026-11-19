@@ -86,13 +86,13 @@ install -m755 "dist/$SLUG.AppImage" "$INSTALL_DIR/bin/$SLUG.AppImage"
 install -m644 src-tauri/icons/128x128.png "$INSTALL_DIR/share/icons/hicolor/128x128/apps/$SLUG.png"
 cat > "$INSTALL_DIR/share/applications/com.scratch.pad.desktop" <<DESKTOP
 [Desktop Entry]
+Type=Application
 Name=$APP_NAME
-Comment=$APP_NAME
-Exec=env GDK_BACKEND=wayland $INSTALL_DIR/bin/$SLUG.AppImage
+Comment=One note, saved as you type
+Exec=env GDK_BACKEND=wayland "$INSTALL_DIR/bin/$SLUG.AppImage"
 Icon=$SLUG
 Terminal=false
-Type=Application
-Categories=Utility;
+Categories=Utility;TextEditor;
 StartupWMClass=com.scratch.pad
 DESKTOP
 echo "Installed $APP_NAME under $INSTALL_DIR"

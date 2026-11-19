@@ -119,6 +119,10 @@ export const createSingleNoteEditorFeature = (
       if (!loaded) return false
       const text = deps.store.get().draft
       const existing = deps.store.get().note[0]
+      if (existing && text === savedText) {
+        deps.errors.clear("The note could not be saved.")
+        return true
+      }
       try {
         const saved = existing
           ? await deps.call<Note>("update_note", { id: existing.id, input: { ...existing, text } })
@@ -178,6 +182,109 @@ export const createSingleNoteEditorFeature = (
 
   textarea.addEventListener("input", () => {
     setDraft(textarea.value)
+  })
+
+  const outdentCount = (line: string): number => {
+    if (line.startsWith("  ")) return 2
+    if (line.startsWith(" ") || line.startsWith("\t")) return 1
+    return 0
+  }
+
+  textarea.addEventListener("keydown", event => {
+    if (document.querySelector(".dialog-overlay")) return
+
+    if (
+      event.key === "F6" &&
+      !event.ctrlKey &&
+      !event.altKey &&
+      !event.shiftKey &&
+      !event.metaKey
+    ) {
+      const target = [...statusBar.querySelectorAll<HTMLButtonElement>("button")].find(
+        btn => !btn.disabled && !btn.hidden && !btn.closest("[hidden]") && btn.tabIndex >= 0,
+      )
+      if (target) {
+        event.preventDefault()
+        target.focus()
+      }
+      return
+    }
+
+    if (event.key !== "Tab" || textarea.readOnly || event.ctrlKey || event.altKey || event.metaKey) {
+      return
+    }
+
+    event.preventDefault()
+    const value = textarea.value
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+
+    if (!event.shiftKey) {
+      if (start === end) {
+        textarea.value = value.slice(0, start) + "  " + value.slice(end)
+        textarea.setSelectionRange(start + 2, start + 2)
+        setDraft(textarea.value)
+        return
+      }
+
+      const lineStart = start === 0 ? 0 : value.lastIndexOf("\n", start - 1) + 1
+      const effectiveEnd = end > start && value[end - 1] === "\n" ? end - 1 : end
+      const lineEndSearch = value.indexOf("\n", effectiveEnd)
+      const blockEnd = lineEndSearch === -1 ? value.length : lineEndSearch
+      const lines = value.slice(lineStart, blockEnd).split("\n")
+      const indented = lines.map(line => "  " + line).join("\n")
+
+      textarea.value = value.slice(0, lineStart) + indented + value.slice(blockEnd)
+      const newStart = start === lineStart ? lineStart : start + 2
+      const newEnd = end + lines.length * 2
+      textarea.setSelectionRange(newStart, newEnd)
+      setDraft(textarea.value)
+      return
+    }
+
+    const lineStart = start === 0 ? 0 : value.lastIndexOf("\n", start - 1) + 1
+    const effectiveEnd = end > start && value[end - 1] === "\n" ? end - 1 : end
+    const lineEndSearch = value.indexOf("\n", effectiveEnd)
+    const blockEnd = lineEndSearch === -1 ? value.length : lineEndSearch
+    const lines = value.slice(lineStart, blockEnd).split("\n")
+    const removals = lines.map(outdentCount)
+    const totalRemoved = removals.reduce((sum, count) => sum + count, 0)
+    if (totalRemoved === 0) return
+
+    const outdented = lines.map((line, index) => line.slice(removals[index] ?? 0)).join("\n")
+    textarea.value = value.slice(0, lineStart) + outdented + value.slice(blockEnd)
+
+    const firstRemoved = removals[0] ?? 0
+    const newStart = lineStart + Math.max(0, start - lineStart - firstRemoved)
+    let newEnd: number
+    if (start === end) {
+      newEnd = newStart
+    } else if (value[end - 1] === "\n") {
+      newEnd = end - totalRemoved
+    } else {
+      const lastLine = lines[lines.length - 1] ?? ""
+      const lastRemoved = removals[removals.length - 1] ?? 0
+      const lastLineStart = blockEnd - lastLine.length
+      const removedBeforeLast = totalRemoved - lastRemoved
+      newEnd = lastLineStart - removedBeforeLast + Math.max(0, end - lastLineStart - lastRemoved)
+    }
+
+    textarea.setSelectionRange(newStart, Math.max(newStart, newEnd))
+    setDraft(textarea.value)
+  })
+
+  statusBar.addEventListener("keydown", event => {
+    if (
+      event.key === "F6" &&
+      !event.ctrlKey &&
+      !event.altKey &&
+      !event.shiftKey &&
+      !event.metaKey &&
+      !document.querySelector(".dialog-overlay")
+    ) {
+      event.preventDefault()
+      textarea.focus()
+    }
   })
 
   return {

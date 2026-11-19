@@ -5,6 +5,7 @@
 pub mod database;
 pub mod error;
 
+use std::path::PathBuf;
 use std::sync::Mutex;
 
 use tauri::{Manager, Runtime, State};
@@ -13,14 +14,35 @@ use crate::error::AppError;
 
 /// The stores every command reads through `State<'_, AppState>`.
 pub struct AppState {
-    pub database: Mutex<rusqlite::Connection>,
+    pub database: Mutex<Option<rusqlite::Connection>>,
+    folder: Option<PathBuf>,
 }
 
-#[tauri::command]
+impl AppState {
+    /// Runs `f` against the active database connection, lazily opening it in degraded mode.
+    pub fn with_db<T>(
+        &self,
+        f: impl FnOnce(&mut rusqlite::Connection) -> Result<T, AppError>,
+    ) -> Result<T, AppError> {
+        let busy = |_| AppError::Storage("The saved records are busy.".into());
+        let mut guard = self.database.lock().map_err(busy)?;
+        if guard.is_none() {
+            let dir = self.folder.as_deref().ok_or_else(|| {
+                AppError::Storage("The saved records could not be opened.".into())
+            })?;
+            let connection = database::open(dir)?;
+            *guard = Some(connection);
+        }
+        let connection = guard
+            .as_mut()
+            .ok_or_else(|| AppError::Storage("The saved records could not be opened.".into()))?;
+        f(connection)
+    }
+}
+
+#[tauri::command(async)]
 fn schema_version(state: State<'_, AppState>) -> Result<usize, AppError> {
-    let busy = |_| AppError::Storage("The saved records are busy.".into());
-    let connection = state.database.lock().map_err(busy)?;
-    database::user_version(&connection)
+    state.with_db(|conn| database::user_version(conn))
 }
 
 /// Opens the stores in `folder` and hands them to Tauri. `run()` passes the app-data folder; tests
@@ -31,9 +53,14 @@ pub fn manage_state<R: Runtime, M: Manager<R>>(
 ) -> Result<(), AppError> {
     let unavailable = |_| AppError::Storage("The app-data folder could not be created.".into());
     std::fs::create_dir_all(folder).map_err(unavailable)?;
-    let database = Mutex::new(database::open(folder)?);
-    manager.manage(AppState { database });
+    let database = Mutex::new(Some(database::open(folder)?));
+    manager.manage(AppState { database, folder: Some(folder.to_path_buf()) });
     Ok(())
+}
+
+/// Registers an empty database state so the window can still open and show a Retry banner.
+pub fn manage_degraded_state<R: Runtime, M: Manager<R>>(manager: &M, folder: &std::path::Path) {
+    manager.manage(AppState { database: Mutex::new(None), folder: Some(folder.to_path_buf()) });
 }
 
 /// The app's one generated context (config, capabilities, icons). Tests build with it too, so a
@@ -63,8 +90,33 @@ pub fn run() {
     app_builder(tauri::Builder::default())
         .setup(|app| {
             let folder = app.path().app_data_dir()?;
-            platform::lifecyclecoordinator::launch(&folder)?;
-            manage_state(app, &folder)?;
+            if platform::lifecyclecoordinator::try_focus_existing(&folder) {
+                app.handle().exit(0);
+                return Ok(());
+            }
+            if let Some((r, g, b)) = platform::theme::active_palette_path()
+                .map(|p| platform::theme::read_palette(&p))
+                .and_then(|pal| {
+                    pal.get("background").and_then(|hex| platform::theme::parse_hex_rgb(hex))
+                })
+            {
+                if let Some(win) = app.get_webview_window("main") {
+                    let _ = win.set_background_color(Some(tauri::window::Color(r, g, b, 255)));
+                }
+            }
+            if platform::lifecyclecoordinator::launch(&folder).is_err()
+                || manage_state(app, &folder).is_err()
+            {
+                manage_degraded_state(app, &folder);
+            }
+            let handle = app.handle().clone();
+            let _ = platform::lifecyclecoordinator::start_instance_listener(&folder, move || {
+                if let Some(win) = handle.get_webview_window("main") {
+                    let _ = win.unminimize();
+                    let _ = win.show();
+                    let _ = win.set_focus();
+                }
+            });
             Ok(())
         })
         .build(context())

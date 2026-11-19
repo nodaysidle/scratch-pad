@@ -1,6 +1,8 @@
 use std::path::{Path, PathBuf};
 
-use scratch_pad_lib::platform::theme::{parse_palette, read_palette};
+use scratch_pad_lib::platform::theme::{
+    parse_hex_rgb, parse_palette, read_palette, resolve_palette_path,
+};
 
 const FULL_THEME: &str = r##"mode = "dark"
 accent = "#cc0000"
@@ -97,4 +99,62 @@ fn every_installed_omarchy_theme_has_the_three_required_colors() {
     }
     println!("checked {checked} installed Omarchy themes");
     assert!(failing.is_empty(), "themes missing a required colour: {failing:?}");
+}
+
+#[test]
+fn parses_hex_rgb_and_rejects_invalid_strings() {
+    assert_eq!(parse_hex_rgb("#000000"), Some((0, 0, 0)));
+    assert_eq!(parse_hex_rgb("#1a2B3c"), Some((0x1a, 0x2b, 0x3c)));
+    assert_eq!(parse_hex_rgb("#ffffff"), Some((255, 255, 255)));
+    assert_eq!(parse_hex_rgb("1a2b3c"), None);
+    assert_eq!(parse_hex_rgb("#12345"), None);
+    assert_eq!(parse_hex_rgb("#1234567"), None);
+    assert_eq!(parse_hex_rgb("#12345g"), None);
+}
+
+#[test]
+fn resolves_palette_path_with_xdg_state_precedence_and_fallback() {
+    let dir = tempfile::tempdir().unwrap();
+    let xdg_state = dir.path().join("xdg_state");
+    let xdg_config = dir.path().join("xdg_config");
+    let home = dir.path().join("home");
+    let rel = "omarchy/current/theme/colors.toml";
+
+    assert_eq!(resolve_palette_path(None, None, None), None);
+    assert_eq!(
+        resolve_palette_path(Some(&xdg_state), Some(&xdg_config), Some(&home)),
+        Some(home.join(".config").join(rel))
+    );
+
+    let home_cfg = home.join(".config").join(rel);
+    std::fs::create_dir_all(home_cfg.parent().unwrap()).unwrap();
+    std::fs::write(&home_cfg, "background = \"#111111\"\n").unwrap();
+    assert_eq!(
+        resolve_palette_path(Some(&xdg_state), Some(&xdg_config), Some(&home)),
+        Some(home_cfg)
+    );
+
+    let xdg_cfg_file = xdg_config.join(rel);
+    std::fs::create_dir_all(xdg_cfg_file.parent().unwrap()).unwrap();
+    std::fs::write(&xdg_cfg_file, "background = \"#222222\"\n").unwrap();
+    assert_eq!(
+        resolve_palette_path(Some(&xdg_state), Some(&xdg_config), Some(&home)),
+        Some(xdg_cfg_file)
+    );
+
+    let home_state = home.join(".local/state").join(rel);
+    std::fs::create_dir_all(home_state.parent().unwrap()).unwrap();
+    std::fs::write(&home_state, "background = \"#333333\"\n").unwrap();
+    assert_eq!(
+        resolve_palette_path(Some(&xdg_state), Some(&xdg_config), Some(&home)),
+        Some(home_state)
+    );
+
+    let xdg_state_file = xdg_state.join(rel);
+    std::fs::create_dir_all(xdg_state_file.parent().unwrap()).unwrap();
+    std::fs::write(&xdg_state_file, "background = \"#444444\"\n").unwrap();
+    assert_eq!(
+        resolve_palette_path(Some(&xdg_state), Some(&xdg_config), Some(&home)),
+        Some(xdg_state_file)
+    );
 }

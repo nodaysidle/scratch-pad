@@ -6,7 +6,7 @@ import { createErrorBanner } from "./errors"
 import { followTerminalFont } from "./font"
 import { bindShortcuts } from "./shortcuts"
 import { followTheme } from "./theme"
-import { confirmDialog } from "./ui"
+import { button, confirmDialog } from "./ui"
 import { createFindFeature } from "./features/findfeature"
 import { createModeLineFeature } from "./features/modelinefeature"
 import { createOpenPlainTextFileToReplaceNoteFeature } from "./features/openplaintextfiletoreplacenotefeature"
@@ -55,14 +55,18 @@ export const saveFeature = createSaveNoteAsMarkdownFileFeature({
 })
 
 // Where a position in the note sits vertically, measured with an off-screen copy of the text
-// (a textarea cannot report the position of a character).
+// (a textarea cannot report the position of a character). A zero-width marker ensures trailing
+// newlines create a measurable line box.
 const reveal = (index: number): void => {
   const mirror = document.createElement("div")
   mirror.className = "editor editor-mirror"
   mirror.style.width = `${editor.textarea.clientWidth}px`
-  mirror.textContent = editor.textarea.value.slice(0, index)
+  const marker = document.createElement("span")
+  marker.className = "editor-mirror-marker"
+  marker.textContent = "\u200b"
+  mirror.append(document.createTextNode(editor.textarea.value.slice(0, index)), marker)
   editor.textarea.after(mirror)
-  const top = mirror.offsetHeight
+  const top = marker.offsetTop
   mirror.remove()
   editor.textarea.scrollTop = Math.max(0, top - editor.textarea.clientHeight / 2)
 }
@@ -70,8 +74,35 @@ const reveal = (index: number): void => {
 const modeLine = createModeLineFeature({ store, textarea: editor.textarea })
 const find = createFindFeature({ textarea: editor.textarea, reveal })
 
-slots.mount("actions", openFeature.button, saveFeature.button)
-slots.mount("status", modeLine.element, find.element, saveFeature.status)
+const findButton = button("Find", () => find.open())
+findButton.title = "Ctrl+F"
+findButton.dataset.key = "^F"
+
+const copyStatus = document.createElement("span")
+copyStatus.className = "copy-status"
+copyStatus.setAttribute("role", "status")
+let copyTimer: number | null = null
+
+const copyAll = (): void => {
+  const write = navigator.clipboard?.writeText(store.get().draft)
+  if (!write) return
+  void write.then(
+    () => {
+      copyStatus.textContent = "Copied."
+      if (copyTimer !== null) window.clearTimeout(copyTimer)
+      copyTimer = window.setTimeout(() => {
+        copyTimer = null
+        copyStatus.textContent = ""
+      }, 1500)
+    },
+    () => {
+      // Clipboard access denied or unavailable; leave copy status empty.
+    },
+  )
+}
+
+slots.mount("actions", findButton, openFeature.button, saveFeature.button)
+slots.mount("status", modeLine.element, find.element, saveFeature.status, copyStatus)
 
 openFeature.button.title = "Ctrl+O"
 openFeature.button.dataset.key = "^O"
@@ -81,6 +112,8 @@ bindShortcuts(document, {
   open: () => void openFeature.openFile(),
   save: () => void saveFeature.saveMarkdown(),
   find: find.open,
+  copyAll,
+  dismissError: errors.dismiss,
 })
 
 followTheme({

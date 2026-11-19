@@ -1,11 +1,8 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it } from "vitest"
 import { createErrorBanner } from "../../src/errors"
-import {
-  createNoteStore,
-  createSingleNoteEditorFeature,
-  type Note,
-} from "../../src/features/singlenoteeditorfeature"
+import { createSlots } from "../../src/store"
+import { createNoteStore, createSingleNoteEditorFeature, type Note } from "../../src/features/singlenoteeditorfeature"
 
 const createFakeTimers = () => {
   let now = 0
@@ -497,5 +494,141 @@ describe("SingleNoteEditorFeature", () => {
     await flushMicrotasks()
     expect(await editor.flush()).toBe(true)
     expect(calls.filter(c => c.command === "create_note")).toEqual([])
+  })
+
+  it("skips update_note when edits revert back to the last saved text before the debounce fires", async () => {
+    const stored: Note[] = [{ id: 1, text: "Original" }]
+    const calls: Array<{ command: string; args: unknown }> = []
+    const clock = createFakeTimers()
+    const store = createNoteStore()
+
+    createSingleNoteEditorFeature({
+      call: async <T>(command: string, args?: Record<string, unknown>): Promise<T> => {
+        calls.push({ command, args })
+        if (command === "list_note") return [...stored] as unknown as T
+        throw new Error(`unexpected ${command}`)
+      },
+      errors: createErrorBanner(root),
+      store,
+      timers: clock.timers,
+    })
+
+    await flushMicrotasks()
+    const textarea = document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Note"]')!
+
+    textarea.value = "Originalx"
+    textarea.dispatchEvent(new Event("input"))
+    clock.advance(500)
+
+    textarea.value = "Original"
+    textarea.dispatchEvent(new Event("input"))
+    clock.advance(1000)
+    await flushMicrotasks()
+
+    expect(calls.filter(c => c.command === "update_note")).toEqual([])
+  })
+
+  it("indents with two spaces on Tab for collapsed and multi-line selections", async () => {
+    const stored: Note[] = [{ id: 1, text: "alpha\nbeta\ngamma" }]
+    const clock = createFakeTimers()
+    const store = createNoteStore()
+
+    const editor = createSingleNoteEditorFeature({
+      call: async <T>(command: string): Promise<T> => {
+        if (command === "list_note") return [...stored] as unknown as T
+        throw new Error(`unexpected ${command}`)
+      },
+      errors: createErrorBanner(root),
+      store,
+      timers: clock.timers,
+    })
+
+    await flushMicrotasks()
+    const textarea = editor.textarea
+
+    textarea.setSelectionRange(2, 2)
+    const collapsedTab = new KeyboardEvent("keydown", { key: "Tab", cancelable: true })
+    textarea.dispatchEvent(collapsedTab)
+    expect(collapsedTab.defaultPrevented).toBe(true)
+    expect(textarea.value).toBe("al  pha\nbeta\ngamma")
+    expect(textarea.selectionStart).toBe(4)
+    expect(textarea.selectionEnd).toBe(4)
+    expect(store.get().draft).toBe("al  pha\nbeta\ngamma")
+
+    textarea.value = "alpha\nbeta\ngamma"
+    textarea.setSelectionRange(1, 9)
+    const multiTab = new KeyboardEvent("keydown", { key: "Tab", cancelable: true })
+    textarea.dispatchEvent(multiTab)
+    expect(multiTab.defaultPrevented).toBe(true)
+    expect(textarea.value).toBe("  alpha\n  beta\ngamma")
+    expect(textarea.selectionStart).toBe(3)
+    expect(textarea.selectionEnd).toBe(13)
+    expect(store.get().draft).toBe("  alpha\n  beta\ngamma")
+  })
+
+  it("outdents up to two spaces or one tab on Shift+Tab", async () => {
+    const stored: Note[] = [{ id: 1, text: "  alpha\n\tbeta\n gamma" }]
+    const clock = createFakeTimers()
+    const store = createNoteStore()
+
+    const editor = createSingleNoteEditorFeature({
+      call: async <T>(command: string): Promise<T> => {
+        if (command === "list_note") return [...stored] as unknown as T
+        throw new Error(`unexpected ${command}`)
+      },
+      errors: createErrorBanner(root),
+      store,
+      timers: clock.timers,
+    })
+
+    await flushMicrotasks()
+    const textarea = editor.textarea
+
+    textarea.setSelectionRange(2, 16)
+    const shiftTab = new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, cancelable: true })
+    textarea.dispatchEvent(shiftTab)
+    expect(shiftTab.defaultPrevented).toBe(true)
+    expect(textarea.value).toBe("alpha\nbeta\ngamma")
+    expect(textarea.selectionStart).toBe(0)
+    expect(textarea.selectionEnd).toBe(12)
+    expect(store.get().draft).toBe("alpha\nbeta\ngamma")
+  })
+
+  it("toggles focus between the textarea and the status bar on F6", async () => {
+    const testSlots = createSlots()
+    const hiddenContainer = document.createElement("div")
+    hiddenContainer.hidden = true
+    const hiddenBtn = document.createElement("button")
+    hiddenBtn.textContent = "Hidden find"
+    hiddenContainer.append(hiddenBtn)
+
+    const openBtn = document.createElement("button")
+    openBtn.textContent = "Open text file"
+    testSlots.mount("status", hiddenContainer)
+    testSlots.mount("actions", openBtn)
+
+    const editor = createSingleNoteEditorFeature({
+      call: async <T>(command: string): Promise<T> => {
+        if (command === "list_note") return [] as unknown as T
+        throw new Error(`unexpected ${command}`)
+      },
+      errors: createErrorBanner(root),
+      store: createNoteStore(),
+      timers: createFakeTimers().timers,
+      slots: testSlots,
+    })
+
+    await flushMicrotasks()
+    expect(document.activeElement).toBe(editor.textarea)
+
+    const toStatus = new KeyboardEvent("keydown", { key: "F6", cancelable: true })
+    editor.textarea.dispatchEvent(toStatus)
+    expect(toStatus.defaultPrevented).toBe(true)
+    expect(document.activeElement).toBe(openBtn)
+
+    const toEditor = new KeyboardEvent("keydown", { key: "F6", bubbles: true, cancelable: true })
+    openBtn.dispatchEvent(toEditor)
+    expect(toEditor.defaultPrevented).toBe(true)
+    expect(document.activeElement).toBe(editor.textarea)
   })
 })

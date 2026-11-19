@@ -218,4 +218,79 @@ describe("OpenPlainTextFileToReplaceNoteFeature", () => {
     expect(confirm).toHaveBeenCalledTimes(2)
     expect(replaceNote).not.toHaveBeenCalled()
   })
+
+  it("clears the file-open error banner when a subsequent read succeeds", async () => {
+    const store = createNoteStore()
+    store.set({ note: [{ id: 1, text: "Original note" }], draft: "Original note" })
+    const errors = createErrorBanner(root)
+    const replaceNote = vi.fn().mockResolvedValue(true)
+    const editor: SingleNoteEditor = {
+      setDraft: vi.fn(),
+      replaceNote,
+      flush: vi.fn().mockResolvedValue(true),
+    }
+    let failRead = true
+
+    const feature = createOpenPlainTextFileToReplaceNoteFeature({
+      call: async <T>(cmd: string): Promise<T> => {
+        if (cmd === "read_text_file") {
+          if (failRead) throw { kind: "invalid", message: "invalid utf8" }
+          return "Good content" as unknown as T
+        }
+        throw new Error(`unexpected ${cmd}`)
+      },
+      errors,
+      store,
+      editor,
+      confirm: vi.fn().mockResolvedValue(true),
+      openDialog: vi.fn().mockResolvedValue("/path/to/file.txt"),
+    })
+
+    await feature.openFile()
+    await flushMicrotasks()
+    const banner = document.querySelector<HTMLElement>(".error-banner")!
+    expect(banner.hidden).toBe(false)
+    expect(banner.querySelector("p")?.textContent).toBe("The file could not be opened.")
+
+    failRead = false
+    await feature.openFile()
+    await flushMicrotasks()
+    expect(banner.hidden).toBe(true)
+    expect(replaceNote).toHaveBeenCalledWith("Good content")
+  })
+
+  it("prevents concurrent openFile calls from opening stacked file dialogs", async () => {
+    const store = createNoteStore()
+    const errors = createErrorBanner(root)
+    const editor: SingleNoteEditor = {
+      setDraft: vi.fn(),
+      replaceNote: vi.fn().mockResolvedValue(true),
+      flush: vi.fn().mockResolvedValue(true),
+    }
+    let resolveDialog: (value: string | null) => void = () => {}
+    const openDialog = vi.fn(
+      () => new Promise<string | null>(resolve => { resolveDialog = resolve }),
+    )
+
+    const feature = createOpenPlainTextFileToReplaceNoteFeature({
+      call: vi.fn(),
+      errors,
+      store,
+      editor,
+      confirm: vi.fn().mockResolvedValue(false),
+      openDialog,
+    })
+
+    const first = feature.openFile()
+    const second = feature.openFile()
+    expect(openDialog).toHaveBeenCalledTimes(1)
+
+    resolveDialog(null)
+    await Promise.all([first, second])
+
+    const third = feature.openFile()
+    expect(openDialog).toHaveBeenCalledTimes(2)
+    resolveDialog(null)
+    await third
+  })
 })

@@ -1,4 +1,73 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
+fn collect_files(dir: &Path, out: &mut Vec<PathBuf>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    let mut paths: Vec<PathBuf> = entries.flatten().map(|entry| entry.path()).collect();
+    paths.sort();
+    for path in paths {
+        if path.is_dir() {
+            collect_files(&path, out);
+        } else if path.is_file() {
+            out.push(path);
+        }
+    }
+}
+
+fn extract_fn_name(line: &str) -> Option<String> {
+    let after_fn = line.strip_prefix("fn ").or_else(|| line.split(" fn ").nth(1))?;
+    let name = after_fn
+        .trim_start()
+        .split(|c: char| c == '(' || c == '<' || c.is_whitespace())
+        .next()?
+        .trim();
+    (!name.is_empty()).then(|| name.to_string())
+}
+
+fn extract_tauri_commands(source: &str) -> Vec<String> {
+    let mut commands = Vec::new();
+    let mut pending_command = false;
+    for raw_line in source.lines() {
+        let line = raw_line.trim();
+        if line.starts_with("//") {
+            continue;
+        }
+        if let Some(rest) = line.strip_prefix("#[tauri::command") {
+            pending_command = true;
+            if let Some((_, after_attr)) = rest.split_once(']') {
+                let after_attr = after_attr.trim();
+                if !after_attr.is_empty() {
+                    if let Some(name) = extract_fn_name(after_attr) {
+                        commands.push(name);
+                        pending_command = false;
+                    }
+                }
+            }
+            continue;
+        }
+        if pending_command {
+            if line.starts_with('#') || line.is_empty() {
+                continue;
+            }
+            if let Some(name) = extract_fn_name(line) {
+                commands.push(name);
+            }
+            pending_command = false;
+        }
+    }
+    commands
+}
+
+fn is_same_file(a: &Path, b: &Path) -> bool {
+    if a == b {
+        return true;
+    }
+    match (std::fs::canonicalize(a), std::fs::canonicalize(b)) {
+        (Ok(ca), Ok(cb)) => ca == cb,
+        _ => false,
+    }
+}
 
 /// Checks for violations of CON-RUNTIME-WIRING across configuration and source files.
 /// Returns a list of error messages for any detected violations.
@@ -15,21 +84,41 @@ pub fn verify_runtime_wiring(manifest_dir: &Path) -> Vec<String> {
     let tauri_conf_str = std::fs::read_to_string(&tauri_conf_path).unwrap_or_default();
     let cap_str = std::fs::read_to_string(&cap_path).unwrap_or_default();
 
-    // 1. Verify #[tauri::command] registration
-    let commands = [
-        "schema_version",
-        "create_note",
-        "list_note",
-        "get_note",
-        "update_note",
-        "read_text_file",
-        "write_markdown_export_file",
-        "theme_palette",
-        "terminal_font",
-    ];
-    for cmd in commands {
-        if !lib_rs.contains(cmd) {
-            violations.push(format!("Command '{cmd}' is missing from lib.rs generate_handler!"));
+    // 1. Verify #[tauri::command] registration dynamically across all src/**/*.rs files
+    let lib_code: String = lib_rs
+        .lines()
+        .filter(|line| !line.trim_start().starts_with("//"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let handler_block = lib_code
+        .split_once("generate_handler![")
+        .and_then(|(_, rest)| rest.split_once(']'))
+        .map(|(inside, _)| inside);
+    if handler_block.is_none() {
+        violations.push("generate_handler![...] is missing from lib.rs".into());
+    }
+    let registered: Vec<String> = handler_block
+        .unwrap_or("")
+        .split(',')
+        .map(|item| {
+            let item = item.trim();
+            item.rsplit("::").next().unwrap_or(item).trim().to_string()
+        })
+        .filter(|name| !name.is_empty())
+        .collect();
+
+    let mut rust_files = Vec::new();
+    collect_files(&manifest_dir.join("src"), &mut rust_files);
+    for path in rust_files {
+        if path.extension().and_then(|ext| ext.to_str()) != Some("rs") {
+            continue;
+        }
+        let source = std::fs::read_to_string(&path).unwrap_or_default();
+        for cmd in extract_tauri_commands(&source) {
+            if !registered.iter().any(|name| name == &cmd) {
+                violations
+                    .push(format!("Command '{cmd}' is missing from lib.rs generate_handler!"));
+            }
         }
     }
 
@@ -68,22 +157,21 @@ pub fn verify_runtime_wiring(manifest_dir: &Path) -> Vec<String> {
         }
     }
 
-    // 4. Verify no test doubles in production files
+    // 4. Verify no test doubles in production files (recursive walk, skipping packaging.rs itself)
     let root = manifest_dir.parent().unwrap_or(manifest_dir);
+    let packaging_rs_path = manifest_dir.join("src/platform/packaging.rs");
     let prod_dirs = [root.join("src"), manifest_dir.join("src")];
     for dir in prod_dirs {
-        if let Ok(entries) = std::fs::read_dir(dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.is_file() {
-                    let content = std::fs::read_to_string(&path).unwrap_or_default();
-                    if content.contains("mock_builder") || content.contains("MockRuntime") {
-                        violations.push(format!(
-                            "Test double found in production file: {}",
-                            path.display()
-                        ));
-                    }
-                }
+        let mut files = Vec::new();
+        collect_files(&dir, &mut files);
+        for path in files {
+            if is_same_file(&path, &packaging_rs_path) {
+                continue;
+            }
+            let content = std::fs::read_to_string(&path).unwrap_or_default();
+            if content.contains("mock_builder") || content.contains("MockRuntime") {
+                violations
+                    .push(format!("Test double found in production file: {}", path.display()));
             }
         }
     }

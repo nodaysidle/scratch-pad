@@ -33,4 +33,33 @@ describe("createCloseHandler", () => {
 
     expect(event.preventDefault).not.toHaveBeenCalled()
   })
+
+  it("prevents re-entrant close events while a close check is already in flight", async () => {
+    let resolveFlush: (value: boolean) => void = () => {}
+    const flush = vi.fn().mockImplementation(
+      () => new Promise<boolean>(resolve => { resolveFlush = resolve }),
+    )
+    const confirm = vi.fn().mockResolvedValue(false)
+    const handler = createCloseHandler({ flush, confirm })
+
+    const firstEvent = { preventDefault: vi.fn() }
+    const secondEvent = { preventDefault: vi.fn() }
+
+    const first = handler(firstEvent)
+    await handler(secondEvent)
+
+    expect(secondEvent.preventDefault).toHaveBeenCalledTimes(1)
+    expect(flush).toHaveBeenCalledTimes(1)
+    expect(confirm).not.toHaveBeenCalled()
+
+    resolveFlush(true)
+    await first
+    expect(firstEvent.preventDefault).not.toHaveBeenCalled()
+
+    const thirdEvent = { preventDefault: vi.fn() }
+    const third = handler(thirdEvent)
+    expect(flush).toHaveBeenCalledTimes(2)
+    resolveFlush(true)
+    await third
+  })
 })

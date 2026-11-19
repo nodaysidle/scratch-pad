@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { createFindFeature, findMatches, stepFrom, type FindFeature } from "../../src/features/findfeature"
+import { createFindFeature, findMatches, findMatchRanges, stepFrom, type FindFeature } from "../../src/features/findfeature"
 
 let current: FindFeature | null = null
 
@@ -53,9 +53,12 @@ describe("FindFeature", () => {
     document.body.innerHTML = ""
   })
 
-  // Every instance keeps its document keydown listener; a hidden one ignores keys.
+  // Clean up document and textarea listeners after each test.
   afterEach(() => {
-    if (current) current.element.hidden = true
+    if (current) {
+      current.destroy()
+      current.element.hidden = true
+    }
     current = null
   })
 
@@ -144,5 +147,110 @@ describe("FindFeature", () => {
     feature.open()
     type("one")
     expect(press("Enter").defaultPrevented).toBe(true)
+  })
+
+  it("maps Unicode İ (U+0130) case-folding offsets back to exact UTF-16 ranges", () => {
+    const text = "İ one İ two"
+    expect(findMatches(text, "one")).toEqual([2])
+    expect(findMatches(text, "two")).toEqual([8])
+    expect(findMatchRanges(text, "İ")).toEqual([
+      { start: 0, end: 1 },
+      { start: 6, end: 7 },
+    ])
+
+    const { textarea, reveal, feature, type } = setup(text)
+    textarea.setSelectionRange(0, 0)
+    feature.open()
+    type("two")
+    press("Enter")
+    expect([textarea.selectionStart, textarea.selectionEnd]).toEqual([8, 11])
+    expect(text.slice(textarea.selectionStart, textarea.selectionEnd)).toBe("two")
+    expect(reveal).toHaveBeenCalledWith(8)
+
+    type("İ")
+    textarea.setSelectionRange(0, 0)
+    press("Enter")
+    expect([textarea.selectionStart, textarea.selectionEnd]).toEqual([0, 1])
+    press("Enter")
+    expect([textarea.selectionStart, textarea.selectionEnd]).toEqual([6, 7])
+  })
+
+  it("associates the Find label with its unique input id", () => {
+    const first = setup("one")
+    const second = setup("two")
+    const label1 = first.feature.element.querySelector("label")!
+    const label2 = second.feature.element.querySelector("label")!
+    expect(label1.textContent).toBe("Find")
+    expect(label1.htmlFor).toBe(first.input.id)
+    expect(first.input.id).not.toBe("")
+    expect(label2.htmlFor).toBe(second.input.id)
+    expect(first.input.id).not.toBe(second.input.id)
+    first.feature.destroy()
+  })
+
+  it("navigates and closes via accessible toolbar buttons", () => {
+    const { textarea, feature, count, type } = setup("one two one")
+    const prev = feature.element.querySelector<HTMLButtonElement>('button[aria-label="Previous match"]')!
+    const next = feature.element.querySelector<HTMLButtonElement>('button[aria-label="Next match"]')!
+    const closeBtn = feature.element.querySelector<HTMLButtonElement>('button[aria-label="Close find"]')!
+
+    expect(prev.textContent).toBe("↑")
+    expect(prev.title).toBe("Shift+Enter")
+    expect(prev.className).toBe("button find-nav")
+    expect(next.textContent).toBe("↓")
+    expect(next.title).toBe("Enter")
+    expect(next.className).toBe("button find-nav")
+    expect(closeBtn.textContent).toBe("×")
+    expect(closeBtn.title).toBe("Esc")
+    expect(closeBtn.className).toBe("button find-nav")
+
+    textarea.setSelectionRange(0, 0)
+    feature.open()
+    type("one")
+    next.click()
+    expect([textarea.selectionStart, textarea.selectionEnd]).toEqual([0, 3])
+    expect(count.textContent).toBe("1 of 2")
+    next.click()
+    expect([textarea.selectionStart, textarea.selectionEnd]).toEqual([8, 11])
+    expect(count.textContent).toBe("2 of 2")
+    prev.click()
+    expect([textarea.selectionStart, textarea.selectionEnd]).toEqual([0, 3])
+    expect(count.textContent).toBe("1 of 2")
+    closeBtn.click()
+    expect(feature.element.hidden).toBe(true)
+    expect(document.activeElement).toBe(textarea)
+  })
+
+  it("refreshes match count on textarea input only when open", () => {
+    const { textarea, feature, count, type } = setup("one")
+    type("one")
+    expect(count.textContent).toBe("1 match")
+    textarea.value = "one one"
+    textarea.dispatchEvent(new Event("input"))
+    expect(count.textContent).toBe("1 match")
+
+    feature.open()
+    expect(count.textContent).toBe("2 matches")
+    textarea.value = "one one one"
+    textarea.dispatchEvent(new Event("input"))
+    expect(count.textContent).toBe("3 matches")
+  })
+
+  it("destroy removes document keydown and textarea input listeners", () => {
+    const { textarea, feature, count, type } = setup("one two one")
+    feature.open()
+    type("one")
+    expect(count.textContent).toBe("2 matches")
+
+    feature.destroy()
+
+    textarea.value = "one"
+    textarea.dispatchEvent(new Event("input"))
+    expect(count.textContent).toBe("2 matches")
+
+    const event = press("Enter")
+    expect(event.defaultPrevented).toBe(false)
+    expect(press("Escape").defaultPrevented).toBe(false)
+    expect(feature.element.hidden).toBe(false)
   })
 })

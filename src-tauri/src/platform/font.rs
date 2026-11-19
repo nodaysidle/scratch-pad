@@ -24,12 +24,26 @@ fn valid_size(text: &str) -> Option<f64> {
     (6.0..=72.0).contains(&size).then_some(size)
 }
 
+fn strip_inline_comment<'a>(terminal: &str, line: &'a str) -> &'a str {
+    let line = line.split('#').next().unwrap_or(line);
+    if terminal == "foot" {
+        return line.split(';').next().unwrap_or(line);
+    }
+    if let Some(idx) = line.find(';') {
+        if idx == 0 || line[..idx].chars().next_back().is_some_and(char::is_whitespace) {
+            return &line[..idx];
+        }
+    }
+    line
+}
+
 /// The font size a terminal's config text states. `terminal` is one of TERMINALS.
 pub fn parse_size(terminal: &str, text: &str) -> Option<f64> {
     let mut section = String::new();
-    for line in text.lines() {
-        let line = line.trim();
-        if line.starts_with('#') || line.starts_with(';') {
+    let mut last = None;
+    for raw_line in text.lines() {
+        let line = strip_inline_comment(terminal, raw_line).trim();
+        if line.is_empty() {
             continue;
         }
         if line.starts_with('[') {
@@ -55,10 +69,10 @@ pub fn parse_size(terminal: &str, text: &str) -> Option<f64> {
             _ => None,
         };
         if found.is_some() {
-            return found;
+            last = found;
         }
     }
-    None
+    last
 }
 
 fn config_path(config_dir: &Path, terminal: &str) -> std::path::PathBuf {
@@ -104,7 +118,14 @@ pub fn terminal_size(config_dir: &Path) -> Option<f64> {
 pub fn terminal_font<R: tauri::Runtime>(
     window: tauri::Window<R>,
 ) -> Result<TerminalFont, AppError> {
-    let size_pt =
-        std::env::var_os("HOME").and_then(|home| terminal_size(&Path::new(&home).join(".config")));
+    let config_dir = std::env::var_os("XDG_CONFIG_HOME")
+        .filter(|value| !value.is_empty())
+        .map(std::path::PathBuf::from)
+        .or_else(|| {
+            std::env::var_os("HOME")
+                .filter(|value| !value.is_empty())
+                .map(|home| Path::new(&home).join(".config"))
+        });
+    let size_pt = config_dir.and_then(|dir| terminal_size(&dir));
     Ok(TerminalFont { size_pt, scale: window.scale_factor().unwrap_or(1.0) })
 }

@@ -121,4 +121,83 @@ describe("followTheme", () => {
     await refresh()
     expect(spy).not.toHaveBeenCalled()
   })
+
+  it("skips polling while hidden and refreshes immediately on visibilitychange and focus", async () => {
+    const root = document.createElement("div")
+    const docTarget = new EventTarget()
+    let hidden = true
+    const doc = Object.assign(docTarget, {
+      get hidden() { return hidden },
+    }) as unknown as Document
+    const win = new EventTarget() as unknown as Window
+    const call = vi.fn(async <T>(): Promise<T> =>
+      ({ background: "#000000", foreground: "#e0e0e0", accent: "#cc0000" }) as unknown as T,
+    )
+    let pollFn: (() => void) | null = null
+    const every = vi.fn((fn: () => void) => { pollFn = fn })
+
+    const refresh = followTheme({
+      call: call as ThemeFollowDeps["call"],
+      root,
+      every,
+      doc,
+      win,
+    })
+    await refresh()
+    expect(call).toHaveBeenCalledTimes(1)
+
+    pollFn!()
+    expect(call).toHaveBeenCalledTimes(1)
+
+    docTarget.dispatchEvent(new Event("visibilitychange"))
+    expect(call).toHaveBeenCalledTimes(1)
+
+    hidden = false
+    docTarget.dispatchEvent(new Event("visibilitychange"))
+    await refresh()
+    expect(call).toHaveBeenCalledTimes(2)
+
+    pollFn!()
+    await refresh()
+    expect(call).toHaveBeenCalledTimes(3)
+
+    ;(win as unknown as EventTarget).dispatchEvent(new Event("focus"))
+    await refresh()
+    expect(call).toHaveBeenCalledTimes(4)
+  })
+
+  it("deduplicates overlapping in-flight theme refreshes", async () => {
+    const root = document.createElement("div")
+    let resolveCall: (value: Palette) => void = () => {}
+    const call = vi.fn(
+      <T>() =>
+        new Promise<T>(resolve => {
+          resolveCall = resolve as unknown as (value: Palette) => void
+        }),
+    )
+    const every = vi.fn()
+    const doc = Object.assign(new EventTarget(), { hidden: false }) as unknown as Document
+    const win = new EventTarget() as unknown as Window
+
+    const refresh = followTheme({
+      call: call as ThemeFollowDeps["call"],
+      root,
+      every,
+      doc,
+      win,
+    })
+    const p1 = refresh()
+    const p2 = refresh()
+    expect(call).toHaveBeenCalledTimes(1)
+
+    resolveCall({ background: "#111111", foreground: "#eeeeee", accent: "#ff0000" })
+    await Promise.all([p1, p2])
+    expect(prop(root, "--bg")).toBe("#111111")
+
+    const p3 = refresh()
+    expect(call).toHaveBeenCalledTimes(2)
+    resolveCall({ background: "#222222", foreground: "#eeeeee", accent: "#ff0000" })
+    await p3
+    expect(prop(root, "--bg")).toBe("#222222")
+  })
 })

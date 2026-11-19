@@ -182,6 +182,60 @@ describe("SaveNoteAsMarkdownFileFeature", () => {
       content: "# Scratch Pad\n\nHello again",
     })
   })
+
+  it("prevents concurrent saveMarkdown calls from stacking save dialogs", async () => {
+    const store = createNoteStore()
+    store.set({ note: [{ id: 1, text: "Hello" }], draft: "Hello" })
+    const errors = createErrorBanner(root)
+    let resolveDialog: (value: string | null) => void = () => {}
+    const saveDialog = vi.fn(
+      () => new Promise<string | null>(resolve => { resolveDialog = resolve }),
+    )
+
+    const feature = createSaveNoteAsMarkdownFileFeature({
+      call: vi.fn(),
+      errors,
+      store,
+      now,
+      saveDialog,
+    })
+
+    const first = feature.saveMarkdown()
+    const second = feature.saveMarkdown()
+    expect(saveDialog).toHaveBeenCalledTimes(1)
+
+    resolveDialog(null)
+    await Promise.all([first, second])
+
+    const third = feature.saveMarkdown()
+    expect(saveDialog).toHaveBeenCalledTimes(2)
+    resolveDialog(null)
+    await third
+  })
+
+  it("clears 'The file was saved.' status after a subsequent draft edit", async () => {
+    const store = createNoteStore()
+    store.set({ note: [{ id: 1, text: "Hello" }], draft: "Hello" })
+    const errors = createErrorBanner(root)
+
+    const feature = createSaveNoteAsMarkdownFileFeature({
+      call: async <T>(): Promise<T> => undefined as unknown as T,
+      errors,
+      store,
+      now,
+      saveDialog: vi.fn().mockResolvedValue("/path/to/note.md"),
+    })
+
+    await feature.saveMarkdown()
+    await flushMicrotasks()
+    expect(feature.status.textContent).toBe("The file was saved.")
+
+    store.set({ note: [{ id: 1, text: "Hello" }] })
+    expect(feature.status.textContent).toBe("The file was saved.")
+
+    store.set({ draft: "Hello edited" })
+    expect(feature.status.textContent).toBe("")
+  })
 })
 
 describe("exportFileName", () => {

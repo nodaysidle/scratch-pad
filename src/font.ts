@@ -19,23 +19,48 @@ export interface FontFollowDeps {
   root: HTMLElement
   every: (fn: () => void, ms: number) => unknown
   pixelRatio: () => number
+  doc?: Document
+  win?: Window
 }
 
 /** Sets the note's font size to the terminal's now and again whenever it changes. */
 export const followTerminalFont = (deps: FontFollowDeps): (() => Promise<void>) => {
   let applied = ""
-  const refresh = async (): Promise<void> => {
-    try {
-      const size = cssFontSize(await deps.call<TerminalFont>("terminal_font"), deps.pixelRatio())
-      // No terminal config right now: keep the size we have.
-      if (!size || size === applied) return
-      applied = size
-      deps.root.style.setProperty("--font-size", size)
-    } catch {
-      // No Tauri runtime or a failed call: the stylesheet's fallback size stays.
-    }
+  let inFlight = false
+  let current: Promise<void> | null = null
+  const doc = deps.doc ?? (typeof document !== "undefined" ? document : undefined)
+  const win = deps.win ?? (typeof window !== "undefined" ? window : undefined)
+
+  const refresh = (): Promise<void> => {
+    if (inFlight && current) return current
+    inFlight = true
+    current = (async () => {
+      try {
+        const size = cssFontSize(await deps.call<TerminalFont>("terminal_font"), deps.pixelRatio())
+        // No terminal config right now: keep the size we have.
+        if (!size || size === applied) return
+        applied = size
+        deps.root.style.setProperty("--font-size", size)
+      } catch {
+        // No Tauri runtime or a failed call: the stylesheet's fallback size stays.
+      } finally {
+        inFlight = false
+        current = null
+      }
+    })()
+    return current
   }
+
   void refresh()
-  deps.every(() => void refresh(), 1000)
+  deps.every(() => {
+    if (doc?.hidden) return
+    void refresh()
+  }, 1000)
+  doc?.addEventListener("visibilitychange", () => {
+    if (!doc.hidden) void refresh()
+  })
+  win?.addEventListener("focus", () => {
+    void refresh()
+  })
   return refresh
 }

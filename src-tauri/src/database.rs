@@ -15,6 +15,21 @@ pub fn open(folder: &Path) -> Result<Connection, AppError> {
         .map_err(|_| AppError::Storage("The app-data folder could not be created.".into()))?;
     let mut connection = Connection::open(folder.join("records.sqlite3"))
         .map_err(|_| AppError::Storage("The saved records could not be opened.".into()))?;
+    connection
+        .busy_timeout(std::time::Duration::from_secs(5))
+        .map_err(|_| AppError::Storage("The saved records could not be opened.".into()))?;
+    if let Err(err) = connection.pragma_update(None, "journal_mode", "WAL") {
+        let is_readonly_or_memory = matches!(
+            err,
+            rusqlite::Error::SqliteFailure(
+                rusqlite::ffi::Error { code: rusqlite::ErrorCode::ReadOnly, .. },
+                _
+            )
+        ) || connection.is_readonly(rusqlite::MAIN_DB).unwrap_or(false);
+        if !is_readonly_or_memory {
+            return Err(AppError::Storage("The saved records could not be opened.".into()));
+        }
+    }
     migrate(&mut connection, MIGRATIONS)?;
     Ok(connection)
 }

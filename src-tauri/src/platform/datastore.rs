@@ -1,4 +1,4 @@
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -9,6 +9,9 @@ use tauri::State;
 use crate::error::AppError;
 use crate::platform::permissioncoordinator::{existing_file, save_target};
 use crate::AppState;
+
+/// Maximum plain-text file size accepted when opening a file into the note (10 MiB).
+pub const MAX_OPEN_BYTES: u64 = 10 * 1024 * 1024;
 
 static TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -89,55 +92,51 @@ pub fn update_note_in_db(
     Ok(note)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn create_note(state: State<'_, AppState>, input: NoteInput) -> Result<Note, AppError> {
-    let mut connection = state
-        .database
-        .lock()
-        .map_err(|_| AppError::Storage("The saved records are busy.".into()))?;
-    create_note_in_db(&mut connection, input)
+    state.with_db(|conn| create_note_in_db(conn, input))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_note(state: State<'_, AppState>) -> Result<Vec<Note>, AppError> {
-    let connection = state
-        .database
-        .lock()
-        .map_err(|_| AppError::Storage("The saved records are busy.".into()))?;
-    list_note_in_db(&connection)
+    state.with_db(|conn| list_note_in_db(conn))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_note(state: State<'_, AppState>, id: i64) -> Result<Note, AppError> {
-    let connection = state
-        .database
-        .lock()
-        .map_err(|_| AppError::Storage("The saved records are busy.".into()))?;
-    get_note_in_db(&connection, id)
+    state.with_db(|conn| get_note_in_db(conn, id))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn update_note(
     state: State<'_, AppState>,
     id: i64,
     input: NoteInput,
 ) -> Result<Note, AppError> {
-    let mut connection = state
-        .database
-        .lock()
-        .map_err(|_| AppError::Storage("The saved records are busy.".into()))?;
-    update_note_in_db(&mut connection, id, input)
+    state.with_db(|conn| update_note_in_db(conn, id, input))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn read_text_file(path: String) -> Result<String, AppError> {
     let canonical = existing_file(Path::new(&path))?;
-    let bytes = std::fs::read(&canonical)
+    let file = std::fs::File::open(&canonical)
         .map_err(|_| AppError::Storage("The file could not be opened.".into()))?;
+    let meta =
+        file.metadata().map_err(|_| AppError::Storage("The file could not be opened.".into()))?;
+    if !meta.is_file() || meta.len() > MAX_OPEN_BYTES {
+        return Err(AppError::Invalid("The file could not be opened.".into()));
+    }
+    let mut bytes = Vec::new();
+    Read::take(file, MAX_OPEN_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|_| AppError::Storage("The file could not be opened.".into()))?;
+    if bytes.len() as u64 > MAX_OPEN_BYTES {
+        return Err(AppError::Invalid("The file could not be opened.".into()));
+    }
     String::from_utf8(bytes).map_err(|_| AppError::Invalid("The file could not be opened.".into()))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn write_markdown_export_file(path: String, content: String) -> Result<(), AppError> {
     let target = save_target(Path::new(&path))?;
     let parent =

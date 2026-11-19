@@ -4,7 +4,7 @@ use scratch_pad_lib as backend;
 use scratch_pad_lib::error::AppError;
 use scratch_pad_lib::platform::datastore::{
     create_note_in_db, get_note_in_db, list_note_in_db, read_text_file, update_note_in_db,
-    write_markdown_export_file, Note, NoteInput,
+    write_markdown_export_file, Note, NoteInput, MAX_OPEN_BYTES,
 };
 
 #[test]
@@ -127,4 +127,25 @@ fn write_markdown_export_file_atomic_and_preserves_existing_on_failure() {
 
     assert!(matches!(result, Err(AppError::Storage(_))));
     assert_eq!(std::fs::read(&existing_in_locked).unwrap(), b"# Scratch Pad\n\nKeep me");
+}
+
+#[test]
+fn read_text_file_rejects_oversized_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let big_path = dir.path().join("too-big.txt");
+    let file = std::fs::File::create(&big_path).unwrap();
+    file.set_len(MAX_OPEN_BYTES + 1).unwrap();
+    drop(file);
+
+    assert!(matches!(read_text_file(big_path.to_string_lossy().into()), Err(AppError::Invalid(_))));
+}
+
+#[test]
+fn open_enables_wal_journal_mode_and_busy_timeout() {
+    let dir = tempfile::tempdir().unwrap();
+    let conn = backend::database::open(dir.path()).unwrap();
+    let journal_mode: String = conn.query_row("PRAGMA journal_mode", [], |row| row.get(0)).unwrap();
+    let busy_timeout: i64 = conn.query_row("PRAGMA busy_timeout", [], |row| row.get(0)).unwrap();
+    assert!(journal_mode.eq_ignore_ascii_case("wal"), "expected wal, got {journal_mode}");
+    assert_eq!(busy_timeout, 5000);
 }

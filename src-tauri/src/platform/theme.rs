@@ -25,6 +25,17 @@ fn is_hex_color(value: &str) -> bool {
         && value[1..].chars().all(|character| character.is_ascii_hexdigit())
 }
 
+/// Parses `#rrggbb` into RGB bytes, returning `None` for any other format.
+pub fn parse_hex_rgb(value: &str) -> Option<(u8, u8, u8)> {
+    if !is_hex_color(value) {
+        return None;
+    }
+    let r = u8::from_str_radix(&value[1..3], 16).ok()?;
+    let g = u8::from_str_radix(&value[3..5], 16).ok()?;
+    let b = u8::from_str_radix(&value[5..7], 16).ok()?;
+    Some((r, g, b))
+}
+
 /// Parses `key = "value"` lines. Unknown keys and values that are not `#rrggbb`
 /// (or `light`/`dark` for `mode`) are dropped.
 pub fn parse_palette(text: &str) -> BTreeMap<String, String> {
@@ -58,10 +69,41 @@ pub fn read_palette(path: &Path) -> BTreeMap<String, String> {
     std::fs::read_to_string(path).map(|text| parse_palette(&text)).unwrap_or_default()
 }
 
+fn env_path(name: &str) -> Option<PathBuf> {
+    std::env::var_os(name).filter(|value| !value.is_empty()).map(PathBuf::from)
+}
+
+/// Resolves the Omarchy active theme palette path across XDG state and config locations.
+pub fn resolve_palette_path(
+    xdg_state: Option<&Path>,
+    xdg_config: Option<&Path>,
+    home: Option<&Path>,
+) -> Option<PathBuf> {
+    let rel = "omarchy/current/theme/colors.toml";
+    let mut candidates = Vec::new();
+    if let Some(dir) = xdg_state.filter(|p| !p.as_os_str().is_empty()) {
+        candidates.push(dir.join(rel));
+    }
+    if let Some(dir) = home.filter(|p| !p.as_os_str().is_empty()) {
+        candidates.push(dir.join(".local/state").join(rel));
+    }
+    if let Some(dir) = xdg_config.filter(|p| !p.as_os_str().is_empty()) {
+        candidates.push(dir.join(rel));
+    }
+    let fallback =
+        home.filter(|p| !p.as_os_str().is_empty()).map(|dir| dir.join(".config").join(rel));
+    if let Some(ref path) = fallback {
+        candidates.push(path.clone());
+    }
+    candidates.into_iter().find(|path| path.is_file()).or(fallback)
+}
+
 /// Where Omarchy keeps the active theme's palette.
 pub fn active_palette_path() -> Option<PathBuf> {
-    let home = std::env::var_os("HOME")?;
-    Some(Path::new(&home).join(".config/omarchy/current/theme/colors.toml"))
+    let xdg_state = env_path("XDG_STATE_HOME");
+    let xdg_config = env_path("XDG_CONFIG_HOME");
+    let home = env_path("HOME");
+    resolve_palette_path(xdg_state.as_deref(), xdg_config.as_deref(), home.as_deref())
 }
 
 /// The active theme's colours; empty when there is no Omarchy theme. Never fails.

@@ -27,10 +27,12 @@ export const createOpenPlainTextFileToReplaceNoteFeature = (
   deps: OpenPlainTextFileDeps,
 ): OpenPlainTextFileFeature => {
   const question = "Replace the current note with the contents of this file?"
+  let busy = false
 
   const readAndReplace = async (path: string): Promise<void> => {
     try {
       const text = await deps.call<string>("read_text_file", { path })
+      deps.errors.clear("The file could not be opened.")
       await deps.editor.replaceNote(text)
     } catch {
       const draftAtFailure = deps.store.get().draft
@@ -43,15 +45,21 @@ export const createOpenPlainTextFileToReplaceNoteFeature = (
   }
 
   const openFile = async (): Promise<void> => {
-    const selected = await deps.openDialog()
-    if (!selected) return
-    const chosenPath = Array.isArray(selected) ? selected[0] : selected
-    if (!chosenPath) return
+    if (busy) return
+    busy = true
+    try {
+      const selected = await deps.openDialog()
+      if (!selected) return
+      const chosenPath = Array.isArray(selected) ? selected[0] : selected
+      if (!chosenPath) return
 
-    const confirmed = await deps.confirm(question, "Replace")
-    if (!confirmed) return
+      const confirmed = await deps.confirm(question, "Replace")
+      if (!confirmed) return
 
-    await readAndReplace(chosenPath)
+      await readAndReplace(chosenPath)
+    } finally {
+      busy = false
+    }
   }
 
   const actionButton = button("Open text file", () => {

@@ -66,4 +66,73 @@ describe("ui building blocks", () => {
     document.querySelectorAll<HTMLButtonElement>(".dialog button")[1]!.click()
     expect(await asked).toBe(true)
   })
+
+  it("links the dialog message with aria-labelledby and does not duplicate aria-label", async () => {
+    document.body.innerHTML = ""
+    const asked = confirmDialog("Replace the note?", "Replace")
+    const dialog = document.querySelector<HTMLElement>(".dialog")!
+    const message = dialog.querySelector<HTMLParagraphElement>("p")!
+    expect(dialog.hasAttribute("aria-label")).toBe(false)
+    expect(message.id).toMatch(/^dialog-msg-\d+$/)
+    expect(dialog.getAttribute("aria-labelledby")).toBe(message.id)
+    document.querySelector<HTMLButtonElement>(".dialog button")!.click()
+    await asked
+  })
+
+  it("traps Tab and Shift+Tab focus between Cancel and confirm buttons", async () => {
+    document.body.innerHTML = ""
+    const asked = confirmDialog("Sure?", "Replace")
+    const buttons = [...document.querySelectorAll<HTMLButtonElement>(".dialog button")]
+    const cancel = buttons[0]!
+    const confirm = buttons[1]!
+    expect(document.activeElement).toBe(cancel)
+
+    const tab = new KeyboardEvent("keydown", { key: "Tab", cancelable: true })
+    document.dispatchEvent(tab)
+    expect(tab.defaultPrevented).toBe(true)
+    expect(document.activeElement).toBe(confirm)
+
+    const shiftTab = new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, cancelable: true })
+    document.dispatchEvent(shiftTab)
+    expect(shiftTab.defaultPrevented).toBe(true)
+    expect(document.activeElement).toBe(cancel)
+
+    cancel.click()
+    await asked
+  })
+
+  it("cancels and resolves false when clicking the backdrop overlay", async () => {
+    document.body.innerHTML = ""
+    const asked = confirmDialog("Sure?", "Delete")
+    const overlay = document.querySelector<HTMLElement>(".dialog-overlay")!
+    const dialog = document.querySelector<HTMLElement>(".dialog")!
+
+    dialog.dispatchEvent(new MouseEvent("click", { bubbles: true }))
+    expect(document.querySelector(".dialog-overlay")).not.toBeNull()
+
+    overlay.dispatchEvent(new MouseEvent("click", { bubbles: true }))
+    expect(await asked).toBe(false)
+    expect(document.querySelector(".dialog-overlay")).toBeNull()
+  })
+
+  it("keeps #app inert across nested dialogs until the last one closes", async () => {
+    document.body.innerHTML = '<main id="app"><textarea></textarea></main>'
+    const app = document.querySelector<HTMLElement>("#app")!
+    const first = confirmDialog("First?", "OK")
+    expect(app.hasAttribute("inert")).toBe(true)
+
+    const second = confirmDialog("Second?", "OK")
+    expect(app.hasAttribute("inert")).toBe(true)
+
+    const overlays = [...document.querySelectorAll<HTMLElement>(".dialog-overlay")]
+    expect(overlays.length).toBe(2)
+
+    overlays[1]!.querySelector<HTMLButtonElement>("button")!.click()
+    expect(await second).toBe(false)
+    expect(app.hasAttribute("inert")).toBe(true)
+
+    overlays[0]!.querySelector<HTMLButtonElement>("button")!.click()
+    expect(await first).toBe(false)
+    expect(app.hasAttribute("inert")).toBe(false)
+  })
 })

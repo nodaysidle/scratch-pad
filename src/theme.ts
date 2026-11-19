@@ -34,6 +34,8 @@ export interface ThemeFollowDeps {
   call: <T>(command: string) => Promise<T>
   root: HTMLElement
   every: (fn: () => void, ms: number) => unknown
+  doc?: Document
+  win?: Window
 }
 
 /**
@@ -43,20 +45,43 @@ export interface ThemeFollowDeps {
  */
 export const followTheme = (deps: ThemeFollowDeps): (() => Promise<void>) => {
   let applied = ""
-  const refresh = async (): Promise<void> => {
-    try {
-      const palette = await deps.call<Palette>("theme_palette")
-      // Mid-switch the file is briefly missing: keep the colours we have.
-      if (!isComplete(palette)) return
-      const next = JSON.stringify(palette)
-      if (next === applied) return
-      applied = next
-      applyPalette(deps.root, palette)
-    } catch {
-      // No Tauri runtime or a failed call: the stylesheet's fallback colours stay.
-    }
+  let inFlight = false
+  let current: Promise<void> | null = null
+  const doc = deps.doc ?? (typeof document !== "undefined" ? document : undefined)
+  const win = deps.win ?? (typeof window !== "undefined" ? window : undefined)
+
+  const refresh = (): Promise<void> => {
+    if (inFlight && current) return current
+    inFlight = true
+    current = (async () => {
+      try {
+        const palette = await deps.call<Palette>("theme_palette")
+        // Mid-switch the file is briefly missing: keep the colours we have.
+        if (!isComplete(palette)) return
+        const next = JSON.stringify(palette)
+        if (next === applied) return
+        applied = next
+        applyPalette(deps.root, palette)
+      } catch {
+        // No Tauri runtime or a failed call: the stylesheet's fallback colours stay.
+      } finally {
+        inFlight = false
+        current = null
+      }
+    })()
+    return current
   }
+
   void refresh()
-  deps.every(() => void refresh(), 1000)
+  deps.every(() => {
+    if (doc?.hidden) return
+    void refresh()
+  }, 1000)
+  doc?.addEventListener("visibilitychange", () => {
+    if (!doc.hidden) void refresh()
+  })
+  win?.addEventListener("focus", () => {
+    void refresh()
+  })
   return refresh
 }

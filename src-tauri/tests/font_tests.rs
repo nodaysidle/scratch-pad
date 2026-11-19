@@ -79,3 +79,28 @@ fn uses_the_default_terminal_then_falls_back() {
     fs::write(&list, "kitty.desktop\n").unwrap();
     assert_eq!(terminal_size(config), Some(12.0));
 }
+
+#[test]
+fn strips_inline_comments_and_uses_last_valid_setting() {
+    assert_eq!(parse_size("ghostty", "font-size = 11 # base\nfont-size = 14 # pt\n"), Some(14.0));
+    assert_eq!(parse_size("ghostty", "font-size = 13 ; spaced comment\n"), Some(13.0));
+    assert_eq!(
+        parse_size("ghostty", "font-size = 14 # valid\nfont-size = 500 # invalid\n"),
+        Some(14.0)
+    );
+    assert_eq!(
+        parse_size("kitty", "font_size 10 # first\nfont_size 12.5 # override\n"),
+        Some(12.5)
+    );
+    assert_eq!(
+        parse_size(
+            "foot",
+            "[main] # header\nfont=Mono:size=9 ; first\nfont=Mono:size=11.5 # override\n"
+        ),
+        Some(11.5)
+    );
+    assert_eq!(
+        parse_size("alacritty", "[font] # section\nsize = 10 # base\nsize = 13 # override\n"),
+        Some(13.0)
+    );
+}

@@ -46,12 +46,26 @@ export const createSaveNoteAsMarkdownFileFeature = (
   const statusElement = document.createElement("p")
   statusElement.setAttribute("role", "status")
   statusElement.className = "muted"
+  let busy = false
+  let savedDraft: string | null = null
+
+  deps.store.subscribe(() => {
+    if (statusElement.textContent === "The file was saved." && deps.store.get().draft !== savedDraft) {
+      statusElement.textContent = ""
+    }
+  })
 
   const performWrite = async (path: string): Promise<void> => {
-    const content = "# Scratch Pad\n\n" + deps.store.get().draft
+    const draft = deps.store.get().draft
+    const content = "# Scratch Pad\n\n" + draft
     try {
       await deps.call("write_markdown_export_file", { path, content })
-      statusElement.textContent = "The file was saved."
+      if (deps.store.get().draft === draft) {
+        savedDraft = draft
+        statusElement.textContent = "The file was saved."
+      } else {
+        statusElement.textContent = ""
+      }
       deps.errors.clear("The file could not be saved.")
     } catch {
       statusElement.textContent = ""
@@ -63,12 +77,18 @@ export const createSaveNoteAsMarkdownFileFeature = (
   }
 
   const saveMarkdown = async (): Promise<void> => {
-    statusElement.textContent = ""
-    const chosenPath = await deps.saveDialog({
-      defaultPath: exportFileName(deps.store.get().draft, deps.now()),
-    })
-    if (!chosenPath) return
-    await performWrite(chosenPath)
+    if (busy) return
+    busy = true
+    try {
+      statusElement.textContent = ""
+      const chosenPath = await deps.saveDialog({
+        defaultPath: exportFileName(deps.store.get().draft, deps.now()),
+      })
+      if (!chosenPath) return
+      await performWrite(chosenPath)
+    } finally {
+      busy = false
+    }
   }
 
   const actionButton = button("Save as Markdown", () => {

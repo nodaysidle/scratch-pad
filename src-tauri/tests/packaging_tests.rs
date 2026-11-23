@@ -42,55 +42,65 @@ fn app_builder_can_invoke_all_data_store_commands() {
     let version = invoke(&webview, "schema_version", json!({})).unwrap();
     assert_eq!(version, json!(backend::database::MIGRATIONS.len()));
 
-    let created = invoke(
-        &webview,
-        "create_note",
-        json!({
-            "input": {
-                "text": "Initial note"
-            }
-        }),
-    )
-    .unwrap();
+    let created =
+        invoke(&webview, "create_note", json!({ "input": { "text": "Initial note" } })).unwrap();
     let id = created["id"].as_i64().expect("created note id");
-    assert_eq!(created["text"], "Initial note");
+    assert_eq!(created, json!({ "id": id }), "a write returns only the id");
 
     let list = invoke(&webview, "list_note", json!({})).unwrap();
     assert_eq!(list, json!([{"id": id, "text": "Initial note"}]));
 
     let fetched = invoke(&webview, "get_note", json!({ "id": id })).unwrap();
-    assert_eq!(fetched, created);
+    assert_eq!(fetched, json!({"id": id, "text": "Initial note"}));
 
-    let updated = invoke(
-        &webview,
-        "update_note",
-        json!({
-            "id": id,
-            "input": {
-                "text": "Updated note"
-            }
-        }),
-    )
-    .unwrap();
-    assert_eq!(updated["text"], "Updated note");
+    let updated =
+        invoke(&webview, "update_note", json!({ "id": id, "input": { "text": "Updated note" } }))
+            .unwrap();
+    assert_eq!(updated, json!({ "id": id }));
+    assert_eq!(invoke(&webview, "get_note", json!({ "id": id })).unwrap()["text"], "Updated note");
+}
 
-    let temp_file = folder.path().join("plain.txt");
-    std::fs::write(&temp_file, b"Plain file content").unwrap();
-    let read_back =
-        invoke(&webview, "read_text_file", json!({ "path": temp_file.to_string_lossy() })).unwrap();
-    assert_eq!(read_back, "Plain file content");
+#[test]
+fn the_webview_cannot_name_a_path() {
+    let app = backend::app_builder(mock_builder()).build(backend::context()).expect("app builds");
+    let folder = tempfile::tempdir().unwrap();
+    backend::manage_state(&app, folder.path()).unwrap();
+    let webview = WebviewWindowBuilder::new(&app, "main", Default::default()).build().unwrap();
 
-    let export_target = folder.path().join("exported.md");
-    let export_result = invoke(
+    let file = folder.path().join("plain.txt");
+    std::fs::write(&file, b"secret").unwrap();
+    let path = file.to_string_lossy();
+    assert!(invoke(&webview, "read_text_file", json!({ "path": path })).is_err());
+    let out = folder.path().join("out.md");
+    assert!(invoke(
         &webview,
         "write_markdown_export_file",
-        json!({
-            "path": export_target.to_string_lossy(),
-            "content": "# Scratch Pad\n\nUpdated note"
-        }),
+        json!({ "path": out.to_string_lossy(), "content": "x" })
+    )
+    .is_err());
+    assert!(!out.exists());
+}
+
+#[test]
+fn capabilities_grant_only_what_the_webview_calls() {
+    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let text = std::fs::read_to_string(manifest_dir.join("capabilities/default.json")).unwrap();
+    let cap: Value = serde_json::from_str(&text).unwrap();
+    let mut permissions: Vec<&str> =
+        cap["permissions"].as_array().unwrap().iter().filter_map(Value::as_str).collect();
+    permissions.sort_unstable();
+    assert_eq!(
+        permissions,
+        ["core:event:allow-listen", "core:event:allow-unlisten", "core:window:allow-destroy"]
     );
-    assert!(export_result.is_ok());
-    assert_eq!(std::fs::read_to_string(&export_target).unwrap(), "# Scratch Pad\n\nUpdated note");
+
+    // The same grants, as the runtime enforces them: listening works, other window calls do not.
+    let app = backend::app_builder(mock_builder()).build(backend::context()).expect("app builds");
+    let webview = WebviewWindowBuilder::new(&app, "main", Default::default()).build().unwrap();
+    let listen = json!({ "event": "omarchy-changed", "target": { "kind": "Any" }, "handler": 1 });
+    assert!(invoke(&webview, "plugin:event|listen", listen).is_ok());
+    assert!(invoke(&webview, "plugin:window|set_title", json!({ "value": "x" })).is_err());
+    assert!(invoke(&webview, "plugin:dialog|open", json!({ "options": {} })).is_err());
 }
 
 #[test]

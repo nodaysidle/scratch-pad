@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { beforeEach, describe, expect, it } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 import { createErrorBanner } from "../../src/errors"
 import { createSlots } from "../../src/store"
 import { createNoteStore, createSingleNoteEditorFeature, type Note } from "../../src/features/singlenoteeditorfeature"
@@ -150,7 +150,7 @@ describe("SingleNoteEditorFeature", () => {
     expect(textarea.value).toBe("Recovered after retry")
   })
 
-  it("saves typed text 1000 ms after typing stops and debounces intermediate changes (ACC-SINGLE-NOTE-EDITOR-01, ACC-SINGLE-NOTE-EDITOR-02)", async () => {
+  it("saves typed text 5000 ms after typing stops and debounces intermediate changes (ACC-SINGLE-NOTE-EDITOR-01, ACC-SINGLE-NOTE-EDITOR-02)", async () => {
     const stored: Note[] = []
     const calls: Array<{ command: string; args: unknown }> = []
     const clock = createFakeTimers()
@@ -165,13 +165,13 @@ describe("SingleNoteEditorFeature", () => {
           const input = (args as { input: { text: string } }).input
           const created: Note = { id: 1, text: input.text }
           stored.splice(0, stored.length, created)
-          return created as unknown as T
+          return { id: created.id } as unknown as T
         }
         if (command === "update_note") {
           const { id, input } = args as { id: number; input: { text: string } }
           const updated: Note = { id, text: input.text }
           stored.splice(0, stored.length, updated)
-          return updated as unknown as T
+          return { id: updated.id } as unknown as T
         }
         throw new Error(`unexpected ${command}`)
       },
@@ -193,7 +193,7 @@ describe("SingleNoteEditorFeature", () => {
     clock.advance(500)
     expect(stored).toEqual([])
 
-    clock.advance(500)
+    clock.advance(4500)
     await flushMicrotasks()
 
     expect(stored).toEqual([{ id: 1, text: "First draft updated" }])
@@ -202,7 +202,7 @@ describe("SingleNoteEditorFeature", () => {
 
     textarea.value = "  leading and trailing  "
     textarea.dispatchEvent(new Event("input"))
-    clock.advance(1000)
+    clock.advance(5000)
     await flushMicrotasks()
 
     expect(stored).toEqual([{ id: 1, text: "  leading and trailing  " }])
@@ -211,7 +211,7 @@ describe("SingleNoteEditorFeature", () => {
 
     textarea.value = ""
     textarea.dispatchEvent(new Event("input"))
-    clock.advance(1000)
+    clock.advance(5000)
     await flushMicrotasks()
 
     expect(stored).toEqual([{ id: 1, text: "" }])
@@ -232,7 +232,7 @@ describe("SingleNoteEditorFeature", () => {
           const { id, input } = args as { id: number; input: { text: string } }
           const updated: Note = { id, text: input.text }
           stored.splice(0, stored.length, updated)
-          return updated as unknown as T
+          return { id: updated.id } as unknown as T
         }
         throw new Error(`unexpected ${command}`)
       },
@@ -246,7 +246,7 @@ describe("SingleNoteEditorFeature", () => {
 
     textarea.value = "Unsaved new text"
     textarea.dispatchEvent(new Event("input"))
-    clock.advance(1000)
+    clock.advance(5000)
     await flushMicrotasks()
 
     expect(stored).toEqual([{ id: 1, text: "Initial saved" }])
@@ -289,7 +289,7 @@ describe("SingleNoteEditorFeature", () => {
           const { id, input } = args as { id: number; input: { text: string } }
           const updated: Note = { id, text: input.text }
           stored.splice(0, stored.length, updated)
-          return updated as unknown as T
+          return { id: updated.id } as unknown as T
         }
         throw new Error(`unexpected ${command}`)
       },
@@ -301,7 +301,7 @@ describe("SingleNoteEditorFeature", () => {
     await flushMicrotasks()
 
     editor.setDraft("First")
-    clock.advance(1000)
+    clock.advance(5000)
     await flushMicrotasks()
     expect(resolveCreate).not.toBeNull()
 
@@ -340,7 +340,7 @@ describe("SingleNoteEditorFeature", () => {
 
     textarea.value = "typed"
     textarea.dispatchEvent(new Event("input"))
-    clock.advance(1000)
+    clock.advance(5000)
     await flushMicrotasks()
     expect(calls.filter(c => c.command === "create_note" || c.command === "update_note")).toEqual([])
 
@@ -386,7 +386,7 @@ describe("SingleNoteEditorFeature", () => {
     await flushMicrotasks()
     expect(textarea.value).toBe("Stored")
 
-    clock.advance(1000)
+    clock.advance(5000)
     await flushMicrotasks()
     expect(calls.filter(c => c.command === "create_note" || c.command === "update_note")).toEqual([])
   })
@@ -408,7 +408,7 @@ describe("SingleNoteEditorFeature", () => {
           const { id, input } = args as { id: number; input: { text: string } }
           const updated: Note = { id, text: input.text }
           stored.splice(0, stored.length, updated)
-          return updated as unknown as T
+          return { id: updated.id } as unknown as T
         }
         throw new Error(`unexpected ${command}`)
       },
@@ -419,7 +419,7 @@ describe("SingleNoteEditorFeature", () => {
 
     await flushMicrotasks()
     editor.setDraft("New")
-    clock.advance(1000)
+    clock.advance(5000)
     await flushMicrotasks()
 
     expect(await editor.flush()).toBe(false)
@@ -445,7 +445,7 @@ describe("SingleNoteEditorFeature", () => {
         if (command === "update_note") {
           if (failWrites) throw { kind: "storage", message: "disk full" }
           const { id, input } = args as { id: number; input: { text: string } }
-          return { id, text: input.text } as unknown as T
+          return { id } as unknown as T
         }
         throw new Error(`unexpected ${command}`)
       },
@@ -458,7 +458,7 @@ describe("SingleNoteEditorFeature", () => {
     const textarea = document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Note"]')!
     textarea.value = "New"
     textarea.dispatchEvent(new Event("input"))
-    clock.advance(1000)
+    clock.advance(5000)
     await flushMicrotasks()
 
     const banner = document.querySelector<HTMLElement>(".error-banner")!
@@ -468,7 +468,7 @@ describe("SingleNoteEditorFeature", () => {
     failWrites = false
     textarea.value = "Newer"
     textarea.dispatchEvent(new Event("input"))
-    clock.advance(1000)
+    clock.advance(5000)
     await flushMicrotasks()
 
     expect(banner.hidden).toBe(true)
@@ -522,7 +522,7 @@ describe("SingleNoteEditorFeature", () => {
 
     textarea.value = "Original"
     textarea.dispatchEvent(new Event("input"))
-    clock.advance(1000)
+    clock.advance(5000)
     await flushMicrotasks()
 
     expect(calls.filter(c => c.command === "update_note")).toEqual([])
@@ -630,5 +630,106 @@ describe("SingleNoteEditorFeature", () => {
     openBtn.dispatchEvent(toEditor)
     expect(toEditor.defaultPrevented).toBe(true)
     expect(document.activeElement).toBe(editor.textarea)
+  })
+
+  it("keeps the saved text itself, tracks dirty, and never needs the commands to echo text", async () => {
+    const calls: Array<{ command: string; args: unknown }> = []
+    const store = createNoteStore()
+    const clock = createFakeTimers()
+    const editor = createSingleNoteEditorFeature({
+      call: async <T>(command: string, args?: Record<string, unknown>): Promise<T> => {
+        calls.push({ command, args })
+        if (command === "list_note") return [] as unknown as T
+        if (command === "create_note") return { id: 7 } as unknown as T
+        if (command === "update_note") return { id: 7 } as unknown as T
+        throw new Error(`unexpected ${command}`)
+      },
+      errors: createErrorBanner(root),
+      store,
+      timers: clock.timers,
+    })
+    await flushMicrotasks()
+    expect(store.get().dirty).toBe(false)
+
+    editor.textarea.value = "one"
+    editor.textarea.dispatchEvent(new Event("input"))
+    expect(store.get().dirty).toBe(true)
+    clock.advance(5000)
+    await flushMicrotasks()
+    expect(store.get().note).toEqual([{ id: 7, text: "one" }])
+    expect(store.get().dirty).toBe(false)
+
+    editor.textarea.value = "two"
+    editor.textarea.dispatchEvent(new Event("input"))
+    await editor.flush()
+    expect(calls.at(-1)).toEqual({ command: "update_note", args: { id: 7, input: { text: "two" } } })
+    expect(store.get().note).toEqual([{ id: 7, text: "two" }])
+    expect(store.get().dirty).toBe(false)
+    // Nothing left to write: no further call.
+    const count = calls.length
+    await editor.flush()
+    expect(calls.length).toBe(count)
+  })
+
+  it("writes the note when the window loses focus, without waiting for the idle timer", async () => {
+    const calls: string[] = []
+    const store = createNoteStore()
+    const editor = createSingleNoteEditorFeature({
+      call: async <T>(command: string): Promise<T> => {
+        calls.push(command)
+        if (command === "list_note") return [] as unknown as T
+        return { id: 1 } as unknown as T
+      },
+      errors: createErrorBanner(root),
+      store,
+      timers: createFakeTimers().timers,
+    })
+    await flushMicrotasks()
+    editor.textarea.value = "typed"
+    editor.textarea.dispatchEvent(new Event("input"))
+    expect(calls).toEqual(["list_note"])
+
+    window.dispatchEvent(new Event("blur"))
+    await flushMicrotasks()
+    expect(calls).toEqual(["list_note", "create_note"])
+    expect(store.get().dirty).toBe(false)
+  })
+
+  it("indents through execCommand so the undo history survives, and falls back to assigning the value", async () => {
+    const store = createNoteStore()
+    const editor = createSingleNoteEditorFeature({
+      call: async <T>(command: string): Promise<T> => {
+        if (command === "list_note") return [{ id: 1, text: "a\nb" }] as unknown as T
+        throw new Error(`unexpected ${command}`)
+      },
+      errors: createErrorBanner(root),
+      store,
+      timers: createFakeTimers().timers,
+    })
+    await flushMicrotasks()
+    const textarea = editor.textarea
+    const original = document.execCommand
+    const exec = vi.fn((_command: string, _ui?: boolean, text?: string) => {
+      textarea.setRangeText(text ?? "")
+      textarea.dispatchEvent(new Event("input"))
+      return true
+    })
+    document.execCommand = exec as unknown as typeof document.execCommand
+    try {
+      textarea.setSelectionRange(0, 3)
+      textarea.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", cancelable: true }))
+      expect(exec).toHaveBeenCalledWith("insertText", false, "  a\n  b")
+      expect(textarea.value).toBe("  a\n  b")
+      expect(store.get().draft).toBe("  a\n  b")
+      expect([textarea.selectionStart, textarea.selectionEnd]).toEqual([0, 7])
+
+      exec.mockReturnValueOnce(false)
+      textarea.setSelectionRange(7, 7)
+      textarea.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", cancelable: true }))
+      expect(textarea.value).toBe("  a\n  b  ")
+      expect(store.get().draft).toBe("  a\n  b  ")
+    } finally {
+      document.execCommand = original
+    }
   })
 })

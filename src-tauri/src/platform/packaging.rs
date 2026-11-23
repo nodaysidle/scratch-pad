@@ -128,7 +128,7 @@ pub fn verify_runtime_wiring(manifest_dir: &Path) -> Vec<String> {
         if trimmed.starts_with("tauri-plugin-") {
             if let Some(crate_name) = trimmed.split('=').next() {
                 let plugin_name = crate_name.trim().replace('-', "_");
-                let init_call = format!("{plugin_name}::init()");
+                let init_call = format!("{plugin_name}::init(");
                 if !lib_rs.contains(&init_call) {
                     violations.push(format!("Plugin '{plugin_name}' is not initialized in lib.rs"));
                 }

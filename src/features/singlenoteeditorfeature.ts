@@ -1,6 +1,7 @@
 import type { call as apiCall } from "../api"
 import type { createErrorBanner } from "../errors"
 import { createSlots, createStore } from "../store"
+import { indentEdit, outdentEdit, type IndentEdit } from "./indent"
 
 export interface Note {
   id: number
@@ -14,6 +15,8 @@ export interface NoteInput {
 export interface SharedViewState {
   note: Note[]
   draft: string
+  /** True from the first edit until the text on screen is the text last written; the mode line reads this instead of comparing strings. */
+  dirty: boolean
   loadError: string | null
 }
 
@@ -26,8 +29,12 @@ export const createNoteStore = () =>
   createStore<SharedViewState>({
     note: [],
     draft: "",
+    dirty: false,
     loadError: null,
   })
+
+/** The note is written after this long without typing, and at once on blur and close. */
+export const IDLE_SAVE_MS = 5000
 
 export const store = createNoteStore()
 export const slots = createSlots()
@@ -79,9 +86,12 @@ export const createSingleNoteEditorFeature = (
   statusBar.append(statusHost, actionsHost)
   host.replaceChildren(textarea, statusBar)
 
+  // The draft the textarea already shows: a reference check per store change instead of reading the whole value.
+  let shown = ""
   deps.store.subscribe(() => {
     const currentDraft = deps.store.get().draft
-    if (textarea.value !== currentDraft) {
+    if (currentDraft !== shown) {
+      shown = currentDraft
       textarea.value = currentDraft
     }
   })
@@ -95,15 +105,15 @@ export const createSingleNoteEditorFeature = (
   const reload = async (): Promise<void> => {
     try {
       const records = await deps.call<Note[]>("list_note")
-      const first = records[0]
+      const first = records[0] // at most one note exists
       savedText = first?.text ?? ""
       loaded = true
       textarea.readOnly = false
       textarea.focus()
-      deps.store.set({ note: first ? [first] : [], draft: savedText, loadError: null })
+      deps.store.set({ note: first ? [first] : [], draft: savedText, dirty: false, loadError: null })
       deps.errors.clear("The note could not be loaded.")
     } catch {
-      deps.store.set({ note: [], draft: "", loadError: "The note could not be loaded." })
+      deps.store.set({ note: [], draft: "", dirty: false, loadError: "The note could not be loaded." })
       deps.errors.show("The note could not be loaded.", retryLoad)
     }
   }
@@ -120,15 +130,18 @@ export const createSingleNoteEditorFeature = (
       const text = deps.store.get().draft
       const existing = deps.store.get().note[0]
       if (existing && text === savedText) {
+        deps.store.set({ dirty: false })
         deps.errors.clear("The note could not be saved.")
         return true
       }
       try {
+        // The commands answer with the id only: what was written is what was sent.
         const saved = existing
-          ? await deps.call<Note>("update_note", { id: existing.id, input: { ...existing, text } })
-          : await deps.call<Note>("create_note", { input: { text } })
+          ? await deps.call<{ id: number }>("update_note", { id: existing.id, input: { text } })
+          : await deps.call<{ id: number }>("create_note", { input: { text } })
         savedText = text
-        deps.store.set({ note: [saved] })
+        // One compare per write: typing during the write leaves the note unsaved.
+        deps.store.set({ note: [{ id: saved.id, text }], dirty: deps.store.get().draft !== text })
         deps.errors.clear("The note could not be saved.")
         return true
       } catch {
@@ -147,14 +160,15 @@ export const createSingleNoteEditorFeature = (
 
   const setDraft = (text: string): void => {
     if (!loaded) return
-    deps.store.set({ draft: text })
+    shown = text
+    deps.store.set({ draft: text, dirty: true })
     if (pendingTimer !== null) {
       deps.timers.clear(pendingTimer)
     }
     pendingTimer = deps.timers.set(() => {
       pendingTimer = null
       void saveDraft()
-    }, 1000)
+    }, IDLE_SAVE_MS)
   }
 
   const replaceNote = (text: string): Promise<boolean> => {
@@ -166,7 +180,7 @@ export const createSingleNoteEditorFeature = (
       deps.timers.clear(pendingTimer)
       pendingTimer = null
     }
-    deps.store.set({ draft: text })
+    deps.store.set({ draft: text, dirty: true })
     return saveDraft()
   }
 
@@ -176,18 +190,29 @@ export const createSingleNoteEditorFeature = (
       pendingTimer = null
     }
     await writeChain
-    if (!loaded || deps.store.get().draft === savedText) return true
+    if (!loaded || !deps.store.get().dirty) return true
     return saveDraft()
   }
+
+  // Leaving the window writes the note now rather than waiting for the idle timer.
+  window.addEventListener("blur", () => {
+    void flush()
+  })
 
   textarea.addEventListener("input", () => {
     setDraft(textarea.value)
   })
 
-  const outdentCount = (line: string): number => {
-    if (line.startsWith("  ")) return 2
-    if (line.startsWith(" ") || line.startsWith("\t")) return 1
-    return 0
+  // execCommand keeps the browser's undo history; without it (or if it refuses) the value is assigned directly.
+  const applyEdit = (edit: IndentEdit): void => {
+    textarea.setSelectionRange(edit.from, edit.to)
+    const done = typeof document.execCommand === "function" && document.execCommand("insertText", false, edit.text)
+    if (!done) {
+      const value = textarea.value
+      textarea.value = value.slice(0, edit.from) + edit.text + value.slice(edit.to)
+      setDraft(textarea.value)
+    }
+    textarea.setSelectionRange(edit.selStart, edit.selEnd)
   }
 
   textarea.addEventListener("keydown", event => {
@@ -215,62 +240,11 @@ export const createSingleNoteEditorFeature = (
     }
 
     event.preventDefault()
-    const value = textarea.value
-    const start = textarea.selectionStart
-    const end = textarea.selectionEnd
-
-    if (!event.shiftKey) {
-      if (start === end) {
-        textarea.value = value.slice(0, start) + "  " + value.slice(end)
-        textarea.setSelectionRange(start + 2, start + 2)
-        setDraft(textarea.value)
-        return
-      }
-
-      const lineStart = start === 0 ? 0 : value.lastIndexOf("\n", start - 1) + 1
-      const effectiveEnd = end > start && value[end - 1] === "\n" ? end - 1 : end
-      const lineEndSearch = value.indexOf("\n", effectiveEnd)
-      const blockEnd = lineEndSearch === -1 ? value.length : lineEndSearch
-      const lines = value.slice(lineStart, blockEnd).split("\n")
-      const indented = lines.map(line => "  " + line).join("\n")
-
-      textarea.value = value.slice(0, lineStart) + indented + value.slice(blockEnd)
-      const newStart = start === lineStart ? lineStart : start + 2
-      const newEnd = end + lines.length * 2
-      textarea.setSelectionRange(newStart, newEnd)
-      setDraft(textarea.value)
-      return
-    }
-
-    const lineStart = start === 0 ? 0 : value.lastIndexOf("\n", start - 1) + 1
-    const effectiveEnd = end > start && value[end - 1] === "\n" ? end - 1 : end
-    const lineEndSearch = value.indexOf("\n", effectiveEnd)
-    const blockEnd = lineEndSearch === -1 ? value.length : lineEndSearch
-    const lines = value.slice(lineStart, blockEnd).split("\n")
-    const removals = lines.map(outdentCount)
-    const totalRemoved = removals.reduce((sum, count) => sum + count, 0)
-    if (totalRemoved === 0) return
-
-    const outdented = lines.map((line, index) => line.slice(removals[index] ?? 0)).join("\n")
-    textarea.value = value.slice(0, lineStart) + outdented + value.slice(blockEnd)
-
-    const firstRemoved = removals[0] ?? 0
-    const newStart = lineStart + Math.max(0, start - lineStart - firstRemoved)
-    let newEnd: number
-    if (start === end) {
-      newEnd = newStart
-    } else if (value[end - 1] === "\n") {
-      newEnd = end - totalRemoved
-    } else {
-      const lastLine = lines[lines.length - 1] ?? ""
-      const lastRemoved = removals[removals.length - 1] ?? 0
-      const lastLineStart = blockEnd - lastLine.length
-      const removedBeforeLast = totalRemoved - lastRemoved
-      newEnd = lastLineStart - removedBeforeLast + Math.max(0, end - lastLineStart - lastRemoved)
-    }
-
-    textarea.setSelectionRange(newStart, Math.max(newStart, newEnd))
-    setDraft(textarea.value)
+    const { selectionStart, selectionEnd, value } = textarea
+    const edit = event.shiftKey
+      ? outdentEdit(value, selectionStart, selectionEnd)
+      : indentEdit(value, selectionStart, selectionEnd)
+    if (edit) applyEdit(edit)
   })
 
   statusBar.addEventListener("keydown", event => {

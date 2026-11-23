@@ -1,11 +1,10 @@
-import { open, save } from "@tauri-apps/plugin-dialog"
+import { listen } from "@tauri-apps/api/event"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 import { call } from "./api"
 import { createCloseHandler } from "./close"
 import { createErrorBanner } from "./errors"
-import { followTerminalFont } from "./font"
+import { followOmarchy } from "./omarchy"
 import { bindShortcuts } from "./shortcuts"
-import { followTheme } from "./theme"
 import { button, confirmDialog } from "./ui"
 import { createFindFeature } from "./features/findfeature"
 import { createModeLineFeature } from "./features/modelinefeature"
@@ -43,14 +42,12 @@ export const openFeature = createOpenPlainTextFileToReplaceNoteFeature({
   store,
   editor,
   confirm: confirmDialog,
-  openDialog: () => open({ multiple: false, directory: false }),
 })
 
 export const saveFeature = createSaveNoteAsMarkdownFileFeature({
   call,
   errors,
   store,
-  saveDialog: opts => save(opts),
   now: () => new Date(),
 })
 
@@ -116,15 +113,10 @@ bindShortcuts(document, {
   dismissError: errors.dismiss,
 })
 
-followTheme({
+void followOmarchy({
   call,
+  listen,
   root: document.documentElement,
-  every: (fn, ms) => window.setInterval(fn, ms),
-})
-followTerminalFont({
-  call,
-  root: document.documentElement,
-  every: (fn, ms) => window.setInterval(fn, ms),
   pixelRatio: () => window.devicePixelRatio,
 })
 

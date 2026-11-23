@@ -1,13 +1,13 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Permissions for every window listed: core, plus exactly the plugins lib.rs initializes. Add each window label that calls commands.",
+  "description": "Permissions for every window listed: only what the webview itself calls (listening for omarchy-changed and for close requests, then destroying the window). Dialogs and files stay in Rust commands. Add each window label that calls commands.",
   "windows": [
     "main"
   ],
   "permissions": [
-    "core:default",
-    "core:window:allow-destroy",
-    "dialog:default"
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "core:window:allow-destroy"
   ]
 }

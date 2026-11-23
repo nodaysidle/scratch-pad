@@ -36,6 +36,22 @@ describe("findMatches", () => {
   })
 })
 
+describe("lowercase cache", () => {
+  it("lowercases the note once per text and again when the text changes", () => {
+    const text = "Alpha ".repeat(10) + "BETA"
+    const lower = vi.spyOn(String.prototype, "toLowerCase")
+    findMatches(text, "x")
+    const first = lower.mock.calls.length
+    findMatches(text, "alpha")
+    findMatches(text, "beta")
+    // Only the two queries are lowercased now, not the note.
+    expect(lower.mock.calls.length - first).toBe(2)
+    expect(findMatches(text + "!", "beta")).toEqual([60])
+    expect(findMatches(text, "beta")).toEqual([60])
+    lower.mockRestore()
+  })
+})
+
 describe("stepFrom", () => {
   it("picks the next or previous match and wraps", () => {
     const matches = [2, 10, 20]

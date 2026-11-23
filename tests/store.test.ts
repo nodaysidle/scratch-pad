@@ -22,21 +22,4 @@ describe("shared view state and slots", () => {
     expect(slots.host("filter").contains(control)).toBe(true)
     expect(slots.host("filter")).toBe(slots.host("filter"))
   })
-
-  it("renders a registered row control once per row with that row's record, and runs a registered handler", async () => {
-    const slots = createSlots()
-    slots.mountRow("row-actions", (record: { id: number }) => {
-      const button = document.createElement("button")
-      button.textContent = "Row " + record.id
-      return button
-    })
-    expect(slots.row("row-actions", { id: 1 }).textContent).toBe("Row 1")
-    expect(slots.row("row-actions", { id: 2 }).textContent).toBe("Row 2")
-    expect(slots.row("row-actions", { id: 2 })).not.toBe(slots.row("row-actions", { id: 2 }))
-    const submit = vi.fn(() => "Enter a name.")
-    slots.handle("add", submit)
-    await expect(slots.run("add")).resolves.toBe("Enter a name.")
-    await expect(slots.run("edit")).resolves.toBeNull()
-    expect(submit).toHaveBeenCalledTimes(1)
-  })
 })

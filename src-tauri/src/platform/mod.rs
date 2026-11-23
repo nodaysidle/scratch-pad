@@ -2,6 +2,7 @@
 pub mod datastore;
 pub mod font;
 pub mod lifecyclecoordinator;
+pub mod omarchy;
 pub mod packaging;
 pub mod permissioncoordinator;
 pub mod theme;

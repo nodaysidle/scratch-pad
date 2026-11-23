@@ -28,203 +28,126 @@ describe("SaveNoteAsMarkdownFileFeature", () => {
     root = document.querySelector<HTMLElement>("#app")!
   })
 
-  it("cancelling the save panel writes no file and shows no message (ACC-SAVE-NOTE-AS-MARKDOWN-FILE-01)", async () => {
-    const store = createNoteStore()
-    store.set({ note: [{ id: 1, text: "Existing note" }], draft: "Existing note" })
-    const errors = createErrorBanner(root)
-    const call = vi.fn()
+  const banner = () => document.querySelector<HTMLElement>(".error-banner")!
+  const retry = () =>
+    [...banner().querySelectorAll("button")].find(b => b.textContent === "Retry")!
 
+  const setup = (draft: string, call: (cmd: string, args?: Record<string, unknown>) => Promise<unknown>) => {
+    const store = createNoteStore()
+    store.set({ note: [{ id: 1, text: "Previous" }], draft })
+    const calls: Array<{ cmd: string; args: unknown }> = []
     const feature = createSaveNoteAsMarkdownFileFeature({
-      call,
-      errors,
+      call: (async (cmd: string, args?: Record<string, unknown>) => {
+        calls.push({ cmd, args })
+        return call(cmd, args)
+      }) as never,
+      errors: createErrorBanner(root),
       store,
       now,
-      saveDialog: vi.fn().mockResolvedValue(null),
     })
+    return { feature, store, calls }
+  }
+
+  it("cancelling the save panel writes no file and shows no message (ACC-SAVE-NOTE-AS-MARKDOWN-FILE-01)", async () => {
+    const { feature } = setup("Existing note", async () => false)
 
     await feature.saveMarkdown()
     await flushMicrotasks()
 
-    expect(call).not.toHaveBeenCalled()
     expect(feature.status.textContent).toBe("")
-    const banner = document.querySelector<HTMLElement>(".error-banner")!
-    expect(banner.hidden).toBe(true)
+    expect(banner().hidden).toBe(true)
   })
 
   it("saving an empty note produces '# Scratch Pad\\n\\n' (ACC-SAVE-NOTE-AS-MARKDOWN-FILE-02)", async () => {
-    const store = createNoteStore()
-    store.set({ note: [{ id: 1, text: "Old note" }], draft: "" })
-    const errors = createErrorBanner(root)
-    const callArgs: Array<{ cmd: string; args: unknown }> = []
-
-    const feature = createSaveNoteAsMarkdownFileFeature({
-      call: async <T>(cmd: string, args?: Record<string, unknown>): Promise<T> => {
-        callArgs.push({ cmd, args })
-        return undefined as unknown as T
-      },
-      errors,
-      store,
-      now,
-      saveDialog: vi.fn().mockResolvedValue("/path/to/scratch-pad.md"),
-    })
+    const { feature, calls } = setup("", async () => true)
 
     await feature.saveMarkdown()
     await flushMicrotasks()
 
-    expect(callArgs).toEqual([
+    expect(calls).toEqual([
       {
-        cmd: "write_markdown_export_file",
-        args: { path: "/path/to/scratch-pad.md", content: "# Scratch Pad\n\n" },
+        cmd: "save_markdown_file",
+        args: { suggestedName: "scratchpad-14-11-2026.md", content: "# Scratch Pad\n\n" },
       },
     ])
     expect(feature.status.textContent).toBe("The file was saved.")
   })
 
-  it("saving a note whose text is 'Hello' produces '# Scratch Pad\\n\\nHello' using the current draft (ACC-SAVE-NOTE-AS-MARKDOWN-FILE-03)", async () => {
-    const store = createNoteStore()
-    // Stored note is empty or older, but draft is 'Hello' (typed less than 1s ago)
-    store.set({ note: [{ id: 1, text: "Previous" }], draft: "Hello" })
-    const errors = createErrorBanner(root)
-    const callArgs: Array<{ cmd: string; args: unknown }> = []
-
-    const feature = createSaveNoteAsMarkdownFileFeature({
-      call: async <T>(cmd: string, args?: Record<string, unknown>): Promise<T> => {
-        callArgs.push({ cmd, args })
-        return undefined as unknown as T
-      },
-      errors,
-      store,
-      now,
-      saveDialog: vi.fn().mockImplementation(async (opts: { defaultPath: string }) => {
-        expect(opts.defaultPath).toBe("hello-14-11-2026.md")
-        return "/path/to/my-note.md"
-      }),
-    })
+  it("sends the current draft and the suggested name, and never a path (ACC-SAVE-NOTE-AS-MARKDOWN-FILE-03)", async () => {
+    const { feature, calls } = setup("Hello", async () => true)
 
     await feature.saveMarkdown()
     await flushMicrotasks()
 
-    expect(callArgs).toEqual([
+    expect(calls).toEqual([
       {
-        cmd: "write_markdown_export_file",
-        args: { path: "/path/to/my-note.md", content: "# Scratch Pad\n\nHello" },
+        cmd: "save_markdown_file",
+        args: { suggestedName: "hello-14-11-2026.md", content: "# Scratch Pad\n\nHello" },
       },
     ])
     expect(feature.status.textContent).toBe("The file was saved.")
   })
 
-  it("leaves status empty, shows error message, and allows retry when write fails (ACC-SAVE-NOTE-AS-MARKDOWN-FILE-04)", async () => {
-    const store = createNoteStore()
-    store.set({ note: [{ id: 1, text: "Hello" }], draft: "Hello" })
-    const errors = createErrorBanner(root)
+  it("leaves status empty, shows an error, and Retry saves the current text when the write fails (ACC-SAVE-NOTE-AS-MARKDOWN-FILE-04)", async () => {
     let shouldFail = true
-    const callArgs: Array<{ cmd: string; args: unknown }> = []
-
-    const feature = createSaveNoteAsMarkdownFileFeature({
-      call: async <T>(cmd: string, args?: Record<string, unknown>): Promise<T> => {
-        callArgs.push({ cmd, args })
-        if (shouldFail) throw { kind: "storage", message: "disk error" }
-        return undefined as unknown as T
-      },
-      errors,
-      store,
-      now,
-      saveDialog: vi.fn().mockResolvedValue("/path/to/fail.md"),
+    const { feature, store, calls } = setup("Hello", async () => {
+      if (shouldFail) throw { kind: "storage", message: "disk error" }
+      return true
     })
 
     await feature.saveMarkdown()
     await flushMicrotasks()
 
     expect(feature.status.textContent).toBe("")
-    const banner = document.querySelector<HTMLElement>(".error-banner")!
-    expect(banner.hidden).toBe(false)
-    expect(banner.querySelector("p")?.textContent).toBe("The file could not be saved.")
+    expect(banner().hidden).toBe(false)
+    expect(banner().querySelector("p")?.textContent).toBe("The file could not be saved.")
 
+    store.set({ draft: "Hello again" })
     shouldFail = false
-    const retryBtn = [...banner.querySelectorAll("button")].find(b => b.textContent === "Retry")!
-    retryBtn.click()
+    retry().click()
     await flushMicrotasks()
 
     expect(feature.status.textContent).toBe("The file was saved.")
-    expect(callArgs.length).toBe(2)
+    expect(calls).toHaveLength(2)
+    expect(calls[1]?.args).toEqual({
+      suggestedName: "helloagain-14-11-2026.md",
+      content: "# Scratch Pad\n\nHello again",
+    })
+    expect(banner().hidden).toBe(true)
   })
-  it("a retry exports the current text", async () => {
-    const store = createNoteStore()
-    store.set({ note: [{ id: 1, text: "Hello" }], draft: "Hello" })
-    const errors = createErrorBanner(root)
-    let shouldFail = true
-    const callArgs: Array<{ cmd: string; args: unknown }> = []
 
-    const feature = createSaveNoteAsMarkdownFileFeature({
-      call: async <T>(cmd: string, args?: Record<string, unknown>): Promise<T> => {
-        callArgs.push({ cmd, args })
-        if (shouldFail) throw { kind: "storage", message: "disk error" }
-        return undefined as unknown as T
-      },
-      errors,
-      store,
-      now,
-      saveDialog: vi.fn().mockResolvedValue("/path/to/fail.md"),
+  it("prevents concurrent saveMarkdown calls from stacking save dialogs", async () => {
+    let resolveDialog: (value: boolean) => void = () => {}
+    const call = vi.fn(() => new Promise<boolean>(resolve => { resolveDialog = resolve }))
+    const { feature } = setup("Hello", call)
+
+    const first = feature.saveMarkdown()
+    const second = feature.saveMarkdown()
+    expect(call).toHaveBeenCalledTimes(1)
+
+    resolveDialog(false)
+    await Promise.all([first, second])
+
+    const third = feature.saveMarkdown()
+    expect(call).toHaveBeenCalledTimes(2)
+    resolveDialog(false)
+    await third
+  })
+
+  it("shows no 'saved' status when the text changed while the dialog was open", async () => {
+    const { feature, store } = setup("Hello", async () => {
+      store.set({ draft: "Hello, edited meanwhile" })
+      return true
     })
 
     await feature.saveMarkdown()
     await flushMicrotasks()
 
-    store.set({ draft: "Hello again" })
-    shouldFail = false
-    const banner = document.querySelector<HTMLElement>(".error-banner")!
-    const retryBtn = [...banner.querySelectorAll("button")].find(b => b.textContent === "Retry")!
-    retryBtn.click()
-    await flushMicrotasks()
-
-    expect(callArgs[1]?.args).toEqual({
-      path: "/path/to/fail.md",
-      content: "# Scratch Pad\n\nHello again",
-    })
-  })
-
-  it("prevents concurrent saveMarkdown calls from stacking save dialogs", async () => {
-    const store = createNoteStore()
-    store.set({ note: [{ id: 1, text: "Hello" }], draft: "Hello" })
-    const errors = createErrorBanner(root)
-    let resolveDialog: (value: string | null) => void = () => {}
-    const saveDialog = vi.fn(
-      () => new Promise<string | null>(resolve => { resolveDialog = resolve }),
-    )
-
-    const feature = createSaveNoteAsMarkdownFileFeature({
-      call: vi.fn(),
-      errors,
-      store,
-      now,
-      saveDialog,
-    })
-
-    const first = feature.saveMarkdown()
-    const second = feature.saveMarkdown()
-    expect(saveDialog).toHaveBeenCalledTimes(1)
-
-    resolveDialog(null)
-    await Promise.all([first, second])
-
-    const third = feature.saveMarkdown()
-    expect(saveDialog).toHaveBeenCalledTimes(2)
-    resolveDialog(null)
-    await third
+    expect(feature.status.textContent).toBe("")
   })
 
   it("clears 'The file was saved.' status after a subsequent draft edit", async () => {
-    const store = createNoteStore()
-    store.set({ note: [{ id: 1, text: "Hello" }], draft: "Hello" })
-    const errors = createErrorBanner(root)
-
-    const feature = createSaveNoteAsMarkdownFileFeature({
-      call: async <T>(): Promise<T> => undefined as unknown as T,
-      errors,
-      store,
-      now,
-      saveDialog: vi.fn().mockResolvedValue("/path/to/note.md"),
-    })
+    const { feature, store } = setup("Hello", async () => true)
 
     await feature.saveMarkdown()
     await flushMicrotasks()

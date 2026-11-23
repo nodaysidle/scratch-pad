@@ -78,8 +78,8 @@ pub fn app_builder<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> 
         platform::datastore::list_note,
         platform::datastore::get_note,
         platform::datastore::update_note,
-        platform::datastore::read_text_file,
-        platform::datastore::write_markdown_export_file,
+        platform::datastore::open_text_file,
+        platform::datastore::save_markdown_file,
         platform::theme::theme_palette,
         platform::font::terminal_font,
     ])
@@ -87,13 +87,13 @@ pub fn app_builder<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> 
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    app_builder(tauri::Builder::default())
+    // Registered first, as the plugin requires: a second launch exits and focuses this instance.
+    let single_instance = tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        platform::lifecyclecoordinator::focus_main_window(app)
+    });
+    app_builder(tauri::Builder::default().plugin(single_instance))
         .setup(|app| {
             let folder = app.path().app_data_dir()?;
-            if platform::lifecyclecoordinator::try_focus_existing(&folder) {
-                app.handle().exit(0);
-                return Ok(());
-            }
             if let Some((r, g, b)) = platform::theme::active_palette_path()
                 .map(|p| platform::theme::read_palette(&p))
                 .and_then(|pal| {
@@ -104,28 +104,17 @@ pub fn run() {
                     let _ = win.set_background_color(Some(tauri::window::Color(r, g, b, 255)));
                 }
             }
-            if platform::lifecyclecoordinator::launch(&folder).is_err()
-                || manage_state(app, &folder).is_err()
-            {
+            // The one place the database is opened and migrated.
+            if manage_state(app, &folder).is_err() {
                 manage_degraded_state(app, &folder);
             }
-            let handle = app.handle().clone();
-            let _ = platform::lifecyclecoordinator::start_instance_listener(&folder, move || {
-                if let Some(win) = handle.get_webview_window("main") {
-                    let _ = win.unminimize();
-                    let _ = win.show();
-                    let _ = win.set_focus();
-                }
-            });
+            // Without a watcher the colours and font are still read once at startup.
+            let _ = platform::omarchy::start(app.handle());
             Ok(())
         })
         .build(context())
         .expect("the app could not start")
-        .run(|_app, event| {
-            if let tauri::RunEvent::Exit = event {
-                platform::lifecyclecoordinator::exit();
-            }
-        });
+        .run(|_app, _event| {});
 }
 
 pub mod platform;

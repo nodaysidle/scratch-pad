@@ -3,15 +3,10 @@ import type { createErrorBanner } from "../errors"
 import { button } from "../ui"
 import type { createNoteStore } from "./singlenoteeditorfeature"
 
-export type SaveDialogAdapter = (options: {
-  defaultPath: string
-}) => Promise<string | null>
-
 export interface SaveNoteAsMarkdownFileDeps {
   call: typeof apiCall
   errors: ReturnType<typeof createErrorBanner>
   store: ReturnType<typeof createNoteStore>
-  saveDialog: SaveDialogAdapter
   /** Today's date goes into the suggested file name. */
   now: () => Date
 }
@@ -55,37 +50,25 @@ export const createSaveNoteAsMarkdownFileFeature = (
     }
   })
 
-  const performWrite = async (path: string): Promise<void> => {
-    const draft = deps.store.get().draft
-    const content = "# Scratch Pad\n\n" + draft
-    try {
-      await deps.call("write_markdown_export_file", { path, content })
-      if (deps.store.get().draft === draft) {
-        savedDraft = draft
-        statusElement.textContent = "The file was saved."
-      } else {
-        statusElement.textContent = ""
-      }
-      deps.errors.clear("The file could not be saved.")
-    } catch {
-      statusElement.textContent = ""
-      deps.errors.show("The file could not be saved.", () => {
-        statusElement.textContent = ""
-        void performWrite(path)
-      })
-    }
-  }
-
+  // Rust shows the save dialog and writes the chosen file in one step, so no path reaches this code.
   const saveMarkdown = async (): Promise<void> => {
     if (busy) return
     busy = true
+    statusElement.textContent = ""
+    const draft = deps.store.get().draft
     try {
-      statusElement.textContent = ""
-      const chosenPath = await deps.saveDialog({
-        defaultPath: exportFileName(deps.store.get().draft, deps.now()),
+      const saved = await deps.call<boolean>("save_markdown_file", {
+        suggestedName: exportFileName(draft, deps.now()),
+        content: "# Scratch Pad\n\n" + draft,
       })
-      if (!chosenPath) return
-      await performWrite(chosenPath)
+      if (!saved) return
+      if (deps.store.get().draft === draft) {
+        savedDraft = draft
+        statusElement.textContent = "The file was saved."
+      }
+      deps.errors.clear("The file could not be saved.")
+    } catch {
+      deps.errors.show("The file could not be saved.", () => void saveMarkdown())
     } finally {
       busy = false
     }

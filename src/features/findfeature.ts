@@ -3,13 +3,24 @@ export interface MatchRange {
   end: number
 }
 
+// The note is searched on every keystroke while the bar is open, so its lowercase copy is kept until the text changes.
+let foldedSource = ""
+let foldedText = ""
+const lowerCased = (text: string): string => {
+  if (text !== foldedSource) {
+    foldedSource = text
+    foldedText = text.toLowerCase()
+  }
+  return foldedText
+}
+
 /**
  * Start and end UTF-16 ranges of every match of query in text; case-insensitive, matches never overlap.
  * Maps case-folded positions back to original UTF-16 offsets so characters such as İ (U+0130) do not drift.
  */
 export const findMatchRanges = (text: string, query: string): MatchRange[] => {
   if (!query) return []
-  const haystack = text.toLowerCase()
+  const haystack = lowerCased(text)
   const needle = query.toLowerCase()
   if (!needle) return []
 

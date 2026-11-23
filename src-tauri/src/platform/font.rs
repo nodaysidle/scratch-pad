@@ -9,7 +9,8 @@ use crate::error::AppError;
 
 // Terminal configs are a few kilobytes; anything far larger is not one.
 const MAX_BYTES: u64 = 256 * 1024;
-const TERMINALS: &[&str] = &["ghostty", "alacritty", "kitty", "foot"];
+/// Each terminal is also the name of its folder under the config folder.
+pub const TERMINALS: &[&str] = &["ghostty", "alacritty", "kitty", "foot"];
 
 #[derive(Serialize, Debug, Clone, PartialEq)]
 pub struct TerminalFont {
@@ -113,19 +114,27 @@ pub fn terminal_size(config_dir: &Path) -> Option<f64> {
     preferred.or_else(|| TERMINALS.iter().find_map(|terminal| size_of(config_dir, terminal)))
 }
 
-/// The terminal's font size and this window's scale factor. Never fails.
-#[tauri::command(async)]
-pub fn terminal_font<R: tauri::Runtime>(
-    window: tauri::Window<R>,
-) -> Result<TerminalFont, AppError> {
-    let config_dir = std::env::var_os("XDG_CONFIG_HOME")
+/// The user's config folder: `$XDG_CONFIG_HOME`, else `~/.config`.
+pub fn config_dir() -> Option<std::path::PathBuf> {
+    std::env::var_os("XDG_CONFIG_HOME")
         .filter(|value| !value.is_empty())
         .map(std::path::PathBuf::from)
         .or_else(|| {
             std::env::var_os("HOME")
                 .filter(|value| !value.is_empty())
                 .map(|home| Path::new(&home).join(".config"))
-        });
-    let size_pt = config_dir.and_then(|dir| terminal_size(&dir));
-    Ok(TerminalFont { size_pt, scale: window.scale_factor().unwrap_or(1.0) })
+        })
+}
+
+/// The terminal's font size at the given monitor scale. Never fails.
+pub fn read_terminal_font(scale: f64) -> TerminalFont {
+    TerminalFont { size_pt: config_dir().and_then(|dir| terminal_size(&dir)), scale }
+}
+
+/// The terminal's font size and this window's scale factor. Never fails.
+#[tauri::command(async)]
+pub fn terminal_font<R: tauri::Runtime>(
+    window: tauri::Window<R>,
+) -> Result<TerminalFont, AppError> {
+    Ok(read_terminal_font(window.scale_factor().unwrap_or(1.0)))
 }

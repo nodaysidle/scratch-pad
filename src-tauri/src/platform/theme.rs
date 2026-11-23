@@ -106,8 +106,13 @@ pub fn active_palette_path() -> Option<PathBuf> {
     resolve_palette_path(xdg_state.as_deref(), xdg_config.as_deref(), home.as_deref())
 }
 
+/// The active theme's colours; empty when there is no Omarchy theme.
+pub fn current_palette() -> BTreeMap<String, String> {
+    active_palette_path().map(|path| read_palette(&path)).unwrap_or_default()
+}
+
 /// The active theme's colours; empty when there is no Omarchy theme. Never fails.
 #[tauri::command(async)]
 pub fn theme_palette() -> Result<BTreeMap<String, String>, AppError> {
-    Ok(active_palette_path().map(|path| read_palette(&path)).unwrap_or_default())
+    Ok(current_palette())
 }

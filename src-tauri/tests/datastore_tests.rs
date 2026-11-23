@@ -3,31 +3,46 @@ use std::os::unix::fs::PermissionsExt;
 use scratch_pad_lib as backend;
 use scratch_pad_lib::error::AppError;
 use scratch_pad_lib::platform::datastore::{
-    create_note_in_db, get_note_in_db, list_note_in_db, read_text_file, update_note_in_db,
-    write_markdown_export_file, Note, NoteInput, MAX_OPEN_BYTES,
+    create_note_in_db, get_note_in_db, list_note_in_db, read_text_at, update_note_in_db,
+    write_text_at, Note, NoteId, NoteInput, MAX_OPEN_BYTES,
 };
+
+fn read_text_file(path: String) -> Result<String, AppError> {
+    read_text_at(std::path::Path::new(&path))
+}
+
+fn write_markdown_export_file(path: String, content: String) -> Result<(), AppError> {
+    write_text_at(std::path::Path::new(&path), &content)
+}
 
 #[test]
 fn note_crud_whitespace_empty_and_reopen_persistence() {
     let dir = tempfile::tempdir().unwrap();
-    let first: Note;
-    let second: Note;
+    let first_id: i64;
+    let second_id: i64;
 
     {
         let mut conn = backend::database::open(dir.path()).unwrap();
+        assert_eq!(list_note_in_db(&conn).unwrap(), vec![]);
+
         let created_empty = create_note_in_db(&mut conn, NoteInput { text: "".into() }).unwrap();
-        assert_eq!(created_empty.text, "");
         assert_eq!(get_note_in_db(&conn, created_empty.id).unwrap().text, "");
 
-        first = update_note_in_db(&mut conn, created_empty.id, NoteInput { text: "   ".into() })
-            .unwrap();
-        assert_eq!(first.id, created_empty.id);
-        assert_eq!(first.text, "   ");
-        assert_eq!(get_note_in_db(&conn, first.id).unwrap().text, "   ");
+        let updated =
+            update_note_in_db(&mut conn, created_empty.id, NoteInput { text: "   ".into() })
+                .unwrap();
+        assert_eq!(updated, NoteId { id: created_empty.id });
+        first_id = updated.id;
+        assert_eq!(get_note_in_db(&conn, first_id).unwrap().text, "   ");
 
-        second = create_note_in_db(&mut conn, NoteInput { text: "Second\nline".into() }).unwrap();
-        let listed = list_note_in_db(&conn).unwrap();
-        assert_eq!(listed, vec![second.clone(), first.clone()]);
+        second_id =
+            create_note_in_db(&mut conn, NoteInput { text: "Second\nline".into() }).unwrap().id;
+        assert!(second_id > first_id);
+        // The list is only the newest note.
+        assert_eq!(
+            list_note_in_db(&conn).unwrap(),
+            vec![Note { id: second_id, text: "Second\nline".into() }]
+        );
 
         assert_eq!(
             get_note_in_db(&conn, 9999),
@@ -40,8 +55,19 @@ fn note_crud_whitespace_empty_and_reopen_persistence() {
     }
 
     let reopened = backend::database::open(dir.path()).unwrap();
-    let listed_after = list_note_in_db(&reopened).unwrap();
-    assert_eq!(listed_after, vec![second, first]);
+    assert_eq!(
+        list_note_in_db(&reopened).unwrap(),
+        vec![Note { id: second_id, text: "Second\nline".into() }]
+    );
+}
+
+#[test]
+fn writes_return_only_the_id() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut conn = backend::database::open(dir.path()).unwrap();
+    let created = create_note_in_db(&mut conn, NoteInput { text: "secret text".into() }).unwrap();
+    let json = serde_json::to_value(created).unwrap();
+    assert_eq!(json, serde_json::json!({ "id": created.id }));
 }
 
 #[test]
@@ -148,4 +174,68 @@ fn open_enables_wal_journal_mode_and_busy_timeout() {
     let busy_timeout: i64 = conn.query_row("PRAGMA busy_timeout", [], |row| row.get(0)).unwrap();
     assert!(journal_mode.eq_ignore_ascii_case("wal"), "expected wal, got {journal_mode}");
     assert_eq!(busy_timeout, 5000);
+}
+
+#[test]
+fn export_writes_through_a_symlink_and_keeps_the_link() {
+    let dir = tempfile::tempdir().unwrap();
+    let real = dir.path().join("real.md");
+    std::fs::write(&real, b"old").unwrap();
+    let link = dir.path().join("link.md");
+    std::os::unix::fs::symlink(&real, &link).unwrap();
+
+    write_markdown_export_file(link.to_string_lossy().into(), "new".into()).unwrap();
+
+    assert!(std::fs::symlink_metadata(&link).unwrap().is_symlink(), "the link must survive");
+    assert_eq!(std::fs::read_to_string(&real).unwrap(), "new");
+    assert_eq!(std::fs::read_to_string(&link).unwrap(), "new");
+}
+
+#[test]
+fn export_writes_through_a_link_to_another_folder_and_leaves_no_temp_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let elsewhere = dir.path().join("elsewhere");
+    std::fs::create_dir(&elsewhere).unwrap();
+    let real = elsewhere.join("real.md");
+    std::fs::write(&real, b"old").unwrap();
+    let link = dir.path().join("link.md");
+    std::os::unix::fs::symlink(&real, &link).unwrap();
+
+    write_markdown_export_file(link.to_string_lossy().into(), "new".into()).unwrap();
+
+    assert_eq!(std::fs::read_to_string(&real).unwrap(), "new");
+    for folder in [dir.path(), elsewhere.as_path()] {
+        let leftovers: Vec<_> = std::fs::read_dir(folder)
+            .unwrap()
+            .flatten()
+            .filter(|entry| entry.file_name().to_string_lossy().ends_with(".tmp"))
+            .collect();
+        assert!(leftovers.is_empty(), "temp files left in {folder:?}");
+    }
+}
+
+#[test]
+fn export_refuses_a_dangling_symlink_without_replacing_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let link = dir.path().join("dangling.md");
+    std::os::unix::fs::symlink(dir.path().join("missing.md"), &link).unwrap();
+
+    assert!(matches!(
+        write_markdown_export_file(link.to_string_lossy().into(), "new".into()),
+        Err(AppError::Invalid(_))
+    ));
+    assert!(std::fs::symlink_metadata(&link).unwrap().is_symlink());
+}
+
+#[test]
+fn export_keeps_an_existing_files_permissions() {
+    let dir = tempfile::tempdir().unwrap();
+    let target = dir.path().join("private.md");
+    std::fs::write(&target, b"old").unwrap();
+    std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o600)).unwrap();
+
+    write_markdown_export_file(target.to_string_lossy().into(), "new".into()).unwrap();
+
+    assert_eq!(std::fs::read_to_string(&target).unwrap(), "new");
+    assert_eq!(std::fs::metadata(&target).unwrap().permissions().mode() & 0o777, 0o600);
 }

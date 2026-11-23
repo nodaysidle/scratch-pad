@@ -5,7 +5,7 @@
 #   --install         build the AppImage and install it under ~/.local
 #   --install-binary  build the plain release binary and install it under ~/.local with its
 #                     icon and launcher entry. Use this on current Arch Linux, where the
-#                     AppImage step fails inside linuxdeploy (see BUILD-NOTES.md).
+#                     AppImage step fails inside linuxdeploy (see docs/BUILD-NOTES.md).
 set -euo pipefail
 
 cd "$(dirname "$0")/.."

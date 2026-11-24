@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Runtime, State};
+use tauri::{AppHandle, Runtime, State, WebviewWindow};
 use tauri_plugin_dialog::DialogExt;
 
 use crate::error::AppError;
@@ -18,6 +18,9 @@ static TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 const SAVE_FAILED: &str = "The note could not be saved.";
 const LOAD_FAILED: &str = "The note could not be loaded.";
+const OPEN_FAILED: &str = "The file could not be opened.";
+const TOO_LARGE: &str = "The file is larger than 10 MiB.";
+const NOT_UTF8: &str = "The file is not UTF-8 text.";
 
 /// Turns any rusqlite failure into the one storage error, so call sites only say what failed.
 trait OrStorage<T> {
@@ -125,21 +128,23 @@ pub fn update_note(
 /// Reads a chosen file as UTF-8 text, refusing anything that is not a regular file of at most 10 MiB.
 pub fn read_text_at(path: &Path) -> Result<String, AppError> {
     let canonical = existing_file(path)?;
-    let file = std::fs::File::open(&canonical)
-        .map_err(|_| AppError::Storage("The file could not be opened.".into()))?;
-    let meta =
-        file.metadata().map_err(|_| AppError::Storage("The file could not be opened.".into()))?;
-    if !meta.is_file() || meta.len() > MAX_OPEN_BYTES {
-        return Err(AppError::Invalid("The file could not be opened.".into()));
+    let file =
+        std::fs::File::open(&canonical).map_err(|_| AppError::Storage(OPEN_FAILED.into()))?;
+    let meta = file.metadata().map_err(|_| AppError::Storage(OPEN_FAILED.into()))?;
+    if !meta.is_file() {
+        return Err(AppError::Invalid(OPEN_FAILED.into()));
+    }
+    if meta.len() > MAX_OPEN_BYTES {
+        return Err(AppError::Invalid(TOO_LARGE.into()));
     }
     let mut bytes = Vec::new();
     Read::take(file, MAX_OPEN_BYTES + 1)
         .read_to_end(&mut bytes)
-        .map_err(|_| AppError::Storage("The file could not be opened.".into()))?;
+        .map_err(|_| AppError::Storage(OPEN_FAILED.into()))?;
     if bytes.len() as u64 > MAX_OPEN_BYTES {
-        return Err(AppError::Invalid("The file could not be opened.".into()));
+        return Err(AppError::Invalid(TOO_LARGE.into()));
     }
-    String::from_utf8(bytes).map_err(|_| AppError::Invalid("The file could not be opened.".into()))
+    String::from_utf8(bytes).map_err(|_| AppError::Invalid(NOT_UTF8.into()))
 }
 
 /// Writes `content` to `path` atomically (temp file + rename in the target's folder). A symlink is
@@ -175,33 +180,43 @@ pub fn write_text_at(path: &Path, content: &str) -> Result<(), AppError> {
     Ok(())
 }
 
-/// Shows the open dialog and reads the chosen file in one step, so the webview never names a path.
-/// `None` means the user cancelled.
+/// Shows the open dialog on top of the note window (so the note cannot be used behind it) and
+/// reads the chosen file in one step, so the webview never names a path. `None` means the user
+/// cancelled.
 #[tauri::command(async)]
-pub fn open_text_file<R: Runtime>(app: AppHandle<R>) -> Result<Option<String>, AppError> {
-    let Some(picked) = app.dialog().file().blocking_pick_file() else {
+pub fn open_text_file<R: Runtime>(
+    app: AppHandle<R>,
+    window: WebviewWindow<R>,
+) -> Result<Option<String>, AppError> {
+    let Some(picked) = app.dialog().file().set_parent(&window).blocking_pick_file() else {
         return Ok(None);
     };
-    let path = picked
-        .into_path()
-        .map_err(|_| AppError::Invalid("The file could not be opened.".into()))?;
+    let path = picked.into_path().map_err(|_| AppError::Invalid(OPEN_FAILED.into()))?;
     read_text_at(&path).map(Some)
 }
 
-/// Shows the save dialog (suggesting `suggested_name`) and writes the chosen file in one step.
-/// Returns false when the user cancelled.
+/// The name is only a suggestion for the dialog: keep its last component so it cannot steer the
+/// folder. Empty when there is no last component.
+pub fn suggested_file_name(suggested: &str) -> String {
+    Path::new(suggested)
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_default()
+}
+
+/// Shows the save dialog on top of the note window (suggesting `suggested_name`) and writes the
+/// chosen file in one step. Returns false when the user cancelled.
 #[tauri::command(async)]
 pub fn save_markdown_file<R: Runtime>(
     app: AppHandle<R>,
+    window: WebviewWindow<R>,
     suggested_name: String,
     content: String,
 ) -> Result<bool, AppError> {
-    // The name is only a suggestion for the dialog: keep its last component so it cannot steer the folder.
-    let name = Path::new(&suggested_name)
-        .file_name()
-        .map(|name| name.to_string_lossy().into_owned())
-        .unwrap_or_default();
-    let Some(picked) = app.dialog().file().set_file_name(name).blocking_save_file() else {
+    let name = suggested_file_name(&suggested_name);
+    let Some(picked) =
+        app.dialog().file().set_parent(&window).set_file_name(name).blocking_save_file()
+    else {
         return Ok(false);
     };
     let path =

@@ -105,7 +105,8 @@ pub fn run() {
                 }
             }
             // The one place the database is opened and migrated.
-            if manage_state(app, &folder).is_err() {
+            if let Err(err) = manage_state(app, &folder) {
+                eprintln!("scratch-pad: the note store is unavailable: {err}");
                 manage_degraded_state(app, &folder);
             }
             // Without a watcher the colours and font are still read once at startup.

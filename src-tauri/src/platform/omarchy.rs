@@ -17,7 +17,8 @@ use crate::platform::{font, theme};
 /// The Tauri event the webview listens to.
 pub const EVENT: &str = "omarchy-changed";
 
-/// Quiet time after the last file event before one event is sent: a theme switch writes many files.
+/// Quiet time after the last file event before an event is sent: a theme switch writes many files.
+/// A switch that pauses longer than this sends more than one event.
 const QUIET: Duration = Duration::from_millis(250);
 
 /// The event payload: what `theme_palette` and `terminal_font` return, together.
@@ -56,7 +57,7 @@ pub fn plan(palette_file: Option<PathBuf>, config_dir: Option<PathBuf>) -> Watch
     plan
 }
 
-/// Starts watching `plan` and calls `on_change` once per burst of relevant events. The watcher
+/// Starts watching `plan` and calls `on_change` at least once per burst of relevant events. The watcher
 /// stops (and its thread ends) when the returned value is dropped. A folder that does not exist
 /// (no Omarchy, no such terminal) is skipped.
 pub fn watch(
@@ -101,7 +102,7 @@ pub fn snapshot<R: Runtime>(app: &AppHandle<R>) -> OmarchyState {
     }
 }
 
-/// Starts the watcher and keeps it alive in managed state; each burst of changes emits `EVENT`.
+/// Starts the watcher and keeps it alive in managed state; each burst of changes emits `EVENT` at least once, carrying the state at that moment.
 pub fn start<R: Runtime>(app: &AppHandle<R>) -> notify::Result<()> {
     let handle = app.clone();
     let watcher =

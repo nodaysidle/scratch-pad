@@ -61,27 +61,6 @@ fn app_builder_can_invoke_all_data_store_commands() {
 }
 
 #[test]
-fn the_webview_cannot_name_a_path() {
-    let app = backend::app_builder(mock_builder()).build(backend::context()).expect("app builds");
-    let folder = tempfile::tempdir().unwrap();
-    backend::manage_state(&app, folder.path()).unwrap();
-    let webview = WebviewWindowBuilder::new(&app, "main", Default::default()).build().unwrap();
-
-    let file = folder.path().join("plain.txt");
-    std::fs::write(&file, b"secret").unwrap();
-    let path = file.to_string_lossy();
-    assert!(invoke(&webview, "read_text_file", json!({ "path": path })).is_err());
-    let out = folder.path().join("out.md");
-    assert!(invoke(
-        &webview,
-        "write_markdown_export_file",
-        json!({ "path": out.to_string_lossy(), "content": "x" })
-    )
-    .is_err());
-    assert!(!out.exists());
-}
-
-#[test]
 fn capabilities_grant_only_what_the_webview_calls() {
     let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
     let text = std::fs::read_to_string(manifest_dir.join("capabilities/default.json")).unwrap();
@@ -123,7 +102,7 @@ fn runtime_wiring_scans_recursively_for_commands_and_test_doubles() {
         .unwrap();
     std::fs::write(
         manifest_dir.join("src/lib.rs"),
-        "pub fn app_builder() { tauri::generate_handler![registered_cmd]; }\n",
+        "pub fn app_builder() { tauri::generate_handler![registered_cmd, path_cmd, buf_cmd, plain_cmd]; }\n",
     )
     .unwrap();
     std::fs::write(
@@ -133,7 +112,10 @@ fn runtime_wiring_scans_recursively_for_commands_and_test_doubles() {
     .unwrap();
     std::fs::write(
         manifest_dir.join("src/platform/commands.rs"),
-        "#[tauri::command(async)]\npub fn registered_cmd() {}\n\n#[tauri::command]\npub fn missing_cmd() {}\n",
+        "#[tauri::command(async)]\npub fn registered_cmd() {}\n\n#[tauri::command]\npub fn missing_cmd() {}\n\n\
+         #[tauri::command]\npub fn path_cmd(path: String) {}\n\n\
+         #[tauri::command(async)]\npub fn buf_cmd<R: Runtime>(\n    app: AppHandle<R>,\n    target: std::path::PathBuf,\n) {}\n\n\
+         #[tauri::command]\npub fn plain_cmd(suggested_name: String, content: String) {}\n",
     )
     .unwrap();
     std::fs::write(root.join("src/nested/double.ts"), "const x = 'MockRuntime';\n").unwrap();
@@ -146,6 +128,16 @@ fn runtime_wiring_scans_recursively_for_commands_and_test_doubles() {
     assert!(
         !violations.iter().any(|v| v.contains("registered_cmd")),
         "did not expect registered_cmd violation, got {violations:?}"
+    );
+    for cmd in ["path_cmd", "buf_cmd"] {
+        assert!(
+            violations.iter().any(|v| v.contains(cmd) && v.contains("takes a path")),
+            "expected {cmd} to be reported as taking a path, got {violations:?}"
+        );
+    }
+    assert!(
+        !violations.iter().any(|v| v.contains("plain_cmd")),
+        "did not expect plain_cmd violation, got {violations:?}"
     );
     assert!(
         violations.iter().any(|v| v.contains("double.ts")),
@@ -173,4 +165,18 @@ fn degraded_state_recovers_when_database_folder_becomes_available() {
     std::fs::remove_file(&blocker).unwrap();
     let version = invoke(&webview, "schema_version", json!({})).unwrap();
     assert_eq!(version, json!(backend::database::MIGRATIONS.len()));
+}
+
+#[test]
+fn a_corrupt_store_is_reported_and_leaves_commands_failing_without_a_panic() {
+    let app = backend::app_builder(mock_builder()).build(backend::context()).expect("app builds");
+    let folder = tempfile::tempdir().unwrap();
+    std::fs::write(folder.path().join("records.sqlite3"), b"this is not a sqlite database")
+        .unwrap();
+
+    assert!(backend::manage_state(&app, folder.path()).is_err());
+    backend::manage_degraded_state(&app, folder.path());
+    let webview = WebviewWindowBuilder::new(&app, "main", Default::default()).build().unwrap();
+
+    assert!(invoke(&webview, "schema_version", json!({})).is_err());
 }

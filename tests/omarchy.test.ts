@@ -112,7 +112,15 @@ describe("followOmarchy", () => {
     const root = document.createElement("div")
     let palette: Palette | Error = dark
     let font: TerminalFont | Error = { size_pt: 12, scale: 1 }
+    // The next two calls (one read) wait for release() and answer with the held values.
+    let held: { values: Record<string, unknown>; gate: Promise<void>; left: number } | undefined
     const call = vi.fn(async <T>(command: string): Promise<T> => {
+      if (held && held.left > 0) {
+        held.left -= 1
+        const { values, gate } = held
+        await gate
+        return values[command] as T
+      }
       const answer = command === "theme_palette" ? palette : font
       if (answer instanceof Error) throw answer
       return answer as T
@@ -140,6 +148,12 @@ describe("followOmarchy", () => {
       answer: (next: { palette?: Palette | Error; font?: TerminalFont | Error }) => {
         if (next.palette) palette = next.palette
         if (next.font) font = next.font
+      },
+      hold: (values: { palette: Palette; font: TerminalFont }): (() => void) => {
+        let release = () => {}
+        const gate = new Promise<void>(resolve => (release = resolve))
+        held = { values: { theme_palette: values.palette, terminal_font: values.font }, gate, left: 2 }
+        return release
       },
     }
   }
@@ -192,6 +206,31 @@ describe("followOmarchy", () => {
     await vi.waitFor(() => expect(prop(root, "--bg")).toBe("#faf4ed"))
     expect(prop(root, "--font-size")).toBe("32.00px")
     expect(call).toHaveBeenCalledTimes(2)
+  })
+
+  const flush = () => new Promise(resolve => setTimeout(resolve, 0))
+
+  it("ignores a re-read that finishes after a newer pushed event", async () => {
+    const { root, win, emit, hold } = await setup()
+    const release = hold({ palette: dark, font: { size_pt: 12, scale: 1 } })
+    win.dispatchEvent(new Event("focus"))
+    emit({ palette: light })
+    release()
+    await flush()
+    expect(prop(root, "--bg")).toBe("#faf4ed")
+  })
+
+  it("keeps the later of two overlapping re-reads when the earlier one finishes last", async () => {
+    const { root, win, hold } = await setup()
+    const releaseFirst = hold({ palette: dark, font: { size_pt: 12, scale: 1 } })
+    win.dispatchEvent(new Event("focus"))
+    const releaseSecond = hold({ palette: light, font: { size_pt: 12, scale: 1 } })
+    win.dispatchEvent(new Event("focus"))
+    releaseSecond()
+    await vi.waitFor(() => expect(prop(root, "--bg")).toBe("#faf4ed"))
+    releaseFirst()
+    await flush()
+    expect(prop(root, "--bg")).toBe("#faf4ed")
   })
 
   it("applies what it can when one command fails, and survives both failing", async () => {

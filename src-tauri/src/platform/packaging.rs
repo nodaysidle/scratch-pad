@@ -25,10 +25,34 @@ fn extract_fn_name(line: &str) -> Option<String> {
     (!name.is_empty()).then(|| name.to_string())
 }
 
-fn extract_tauri_commands(source: &str) -> Vec<String> {
+/// The text between the `(` after `fn name` and its matching `)`, which may span several lines.
+fn parameter_list(from_line: &str, name: &str) -> String {
+    let after_name = from_line.find(&format!("fn {name}")).map_or("", |at| &from_line[at..]);
+    let Some((_, params)) = after_name.split_once('(') else {
+        return String::new();
+    };
+    let mut depth = 1;
+    for (at, c) in params.char_indices() {
+        match c {
+            '(' => depth += 1,
+            ')' => depth -= 1,
+            _ => {}
+        }
+        if depth == 0 {
+            return params[..at].to_string();
+        }
+    }
+    params.to_string()
+}
+
+/// Returns each Tauri command's name with the text of its parameter list.
+pub fn tauri_command_signatures(source: &str) -> Vec<(String, String)> {
     let mut commands = Vec::new();
     let mut pending_command = false;
-    for raw_line in source.lines() {
+    let mut offset = 0;
+    for raw_line in source.split_inclusive('\n') {
+        let line_start = offset;
+        offset += raw_line.len();
         let line = raw_line.trim();
         if line.starts_with("//") {
             continue;
@@ -39,7 +63,8 @@ fn extract_tauri_commands(source: &str) -> Vec<String> {
                 let after_attr = after_attr.trim();
                 if !after_attr.is_empty() {
                     if let Some(name) = extract_fn_name(after_attr) {
-                        commands.push(name);
+                        let params = parameter_list(&source[line_start..], &name);
+                        commands.push((name, params));
                         pending_command = false;
                     }
                 }
@@ -51,12 +76,39 @@ fn extract_tauri_commands(source: &str) -> Vec<String> {
                 continue;
             }
             if let Some(name) = extract_fn_name(line) {
-                commands.push(name);
+                let params = parameter_list(&source[line_start..], &name);
+                commands.push((name, params));
             }
             pending_command = false;
         }
     }
     commands
+}
+
+/// True when a parameter list has a parameter that carries a filesystem path: a type that mentions
+/// `Path` (so `PathBuf` and `&Path` too), or a name that is `path` or ends in `_path`.
+fn takes_a_path(params: &str) -> bool {
+    let mut parts = Vec::new();
+    let (mut depth, mut start) = (0, 0);
+    for (at, c) in params.char_indices() {
+        match c {
+            '<' | '(' | '[' => depth += 1,
+            '>' | ')' | ']' => depth -= 1,
+            ',' if depth == 0 => {
+                parts.push(&params[start..at]);
+                start = at + 1;
+            }
+            _ => {}
+        }
+    }
+    parts.push(&params[start..]);
+    parts.iter().any(|part| {
+        let Some((name, ty)) = part.split_once(':') else {
+            return false;
+        };
+        let name = name.trim();
+        ty.contains("Path") || name == "path" || name.ends_with("_path")
+    })
 }
 
 fn is_same_file(a: &Path, b: &Path) -> bool {
@@ -114,10 +166,13 @@ pub fn verify_runtime_wiring(manifest_dir: &Path) -> Vec<String> {
             continue;
         }
         let source = std::fs::read_to_string(&path).unwrap_or_default();
-        for cmd in extract_tauri_commands(&source) {
+        for (cmd, params) in tauri_command_signatures(&source) {
             if !registered.iter().any(|name| name == &cmd) {
                 violations
                     .push(format!("Command '{cmd}' is missing from lib.rs generate_handler!"));
+            }
+            if takes_a_path(&params) {
+                violations.push(format!("Command '{cmd}' takes a path from the webview"));
             }
         }
     }

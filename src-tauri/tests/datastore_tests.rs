@@ -3,8 +3,8 @@ use std::os::unix::fs::PermissionsExt;
 use scratch_pad_lib as backend;
 use scratch_pad_lib::error::AppError;
 use scratch_pad_lib::platform::datastore::{
-    create_note_in_db, get_note_in_db, list_note_in_db, read_text_at, update_note_in_db,
-    write_text_at, Note, NoteId, NoteInput, MAX_OPEN_BYTES,
+    create_note_in_db, get_note_in_db, list_note_in_db, read_text_at, suggested_file_name,
+    update_note_in_db, write_text_at, Note, NoteId, NoteInput, MAX_OPEN_BYTES,
 };
 
 fn read_text_file(path: String) -> Result<String, AppError> {
@@ -238,4 +238,36 @@ fn export_keeps_an_existing_files_permissions() {
 
     assert_eq!(std::fs::read_to_string(&target).unwrap(), "new");
     assert_eq!(std::fs::metadata(&target).unwrap().permissions().mode() & 0o777, 0o600);
+}
+
+#[test]
+fn suggested_file_name_keeps_only_the_last_component() {
+    assert_eq!(suggested_file_name("notes.md"), "notes.md");
+    assert_eq!(suggested_file_name("../x.md"), "x.md");
+    assert_eq!(suggested_file_name("/etc/passwd"), "passwd");
+    assert_eq!(suggested_file_name(".."), "");
+    assert_eq!(suggested_file_name(""), "");
+}
+
+#[test]
+fn a_refused_file_says_why() {
+    let dir = tempfile::tempdir().unwrap();
+
+    let big = dir.path().join("big.txt");
+    let file = std::fs::File::create(&big).unwrap();
+    file.set_len(MAX_OPEN_BYTES + 1).unwrap();
+    drop(file);
+    assert_eq!(
+        read_text_at(&big),
+        Err(AppError::Invalid("The file is larger than 10 MiB.".into()))
+    );
+
+    let binary = dir.path().join("bad.bin");
+    std::fs::write(&binary, [0xff, 0xfe, 0xfd]).unwrap();
+    assert_eq!(read_text_at(&binary), Err(AppError::Invalid("The file is not UTF-8 text.".into())));
+
+    assert_eq!(
+        read_text_at(&dir.path().join("missing.txt")),
+        Err(AppError::Invalid("The file could not be opened.".into()))
+    );
 }

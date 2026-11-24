@@ -36,7 +36,7 @@ fn watching(plan: WatchPlan) -> (notify::RecommendedWatcher, mpsc::Receiver<()>)
 }
 
 #[test]
-fn a_theme_switch_that_recreates_the_theme_folder_sends_one_event() {
+fn recreating_the_theme_folder_sends_one_event_per_burst_and_keeps_watching() {
     let root = tempfile::tempdir().unwrap();
     let current = root.path().join("omarchy/current");
     let theme = current.join("theme");
@@ -45,7 +45,7 @@ fn a_theme_switch_that_recreates_the_theme_folder_sends_one_event() {
     let (_watcher, rx) =
         watching(plan(Some(theme.join("colors.toml")), Some(root.path().join("config"))));
 
-    // What Omarchy does on a switch: delete the folder, then bring a new one back.
+    // Delete the folder, then bring a new one back, all within the quiet time.
     std::fs::remove_dir_all(&theme).unwrap();
     std::fs::create_dir_all(&theme).unwrap();
     std::fs::write(theme.join("colors.toml"), "background = \"#ffffff\"\n").unwrap();
@@ -56,6 +56,31 @@ fn a_theme_switch_that_recreates_the_theme_folder_sends_one_event() {
     // The new folder is watched too.
     std::fs::write(theme.join("colors.toml"), "background = \"#123456\"\n").unwrap();
     rx.recv_timeout(WAIT).expect("an event for the recreated folder");
+}
+
+#[test]
+fn the_real_theme_switch_renames_next_theme_over_theme_and_keeps_watching() {
+    let root = tempfile::tempdir().unwrap();
+    let current = root.path().join("omarchy/current");
+    let theme = current.join("theme");
+    let next = current.join("next-theme");
+    std::fs::create_dir_all(&theme).unwrap();
+    std::fs::write(theme.join("colors.toml"), "background = \"#000000\"\n").unwrap();
+    let (_watcher, rx) =
+        watching(plan(Some(theme.join("colors.toml")), Some(root.path().join("config"))));
+
+    // What omarchy-theme-set does: build next-theme, drop theme, rename next-theme to theme.
+    std::fs::create_dir_all(&next).unwrap();
+    std::fs::write(next.join("colors.toml"), "background = \"#ffffff\"\n").unwrap();
+    std::fs::remove_dir_all(&theme).unwrap();
+    std::fs::rename(&next, &theme).unwrap();
+
+    // A slow switch may send more than one event, so only "at least one" is asserted.
+    rx.recv_timeout(WAIT).expect("at least one change event");
+    while rx.recv_timeout(Duration::from_millis(600)).is_ok() {}
+
+    std::fs::write(theme.join("colors.toml"), "background = \"#123456\"\n").unwrap();
+    rx.recv_timeout(WAIT).expect("an event for the renamed folder");
 }
 
 #[test]

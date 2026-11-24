@@ -69,6 +69,8 @@ export interface OmarchyFollowDeps {
 export const followOmarchy = async (deps: OmarchyFollowDeps): Promise<void> => {
   let appliedPalette = ""
   let appliedSize = ""
+  // Counts reads and pushed events, so a read that finishes after something newer is dropped.
+  let latest = 0
 
   const apply = (state: Partial<OmarchyState>): void => {
     const { palette, font } = state
@@ -89,11 +91,13 @@ export const followOmarchy = async (deps: OmarchyFollowDeps): Promise<void> => {
   }
 
   const read = async (): Promise<void> => {
+    const mine = ++latest
     // No Tauri runtime or a failed call: the stylesheet's fallback colours and size stay.
     const [palette, font] = await Promise.allSettled([
       deps.call<Palette>("theme_palette"),
       deps.call<TerminalFont>("terminal_font"),
     ])
+    if (mine !== latest) return
     apply({
       palette: palette.status === "fulfilled" ? palette.value : undefined,
       font: font.status === "fulfilled" ? font.value : undefined,
@@ -101,7 +105,10 @@ export const followOmarchy = async (deps: OmarchyFollowDeps): Promise<void> => {
   }
 
   try {
-    await deps.listen<OmarchyState>("omarchy-changed", event => apply(event.payload))
+    await deps.listen<OmarchyState>("omarchy-changed", event => {
+      latest += 1
+      apply(event.payload)
+    })
   } catch {
     // Outside a Tauri runtime (such as unit tests) there are no events; the startup read still applies.
   }

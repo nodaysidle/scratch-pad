@@ -20,9 +20,9 @@ Scratch Pad opens straight into your note with the cursor ready. There are no ta
 
 - **One note, saved automatically:** saves after 10 seconds of idle, when you press `Ctrl+S`, when the window loses focus, and on close. If a closing save fails, the window stays open and tells you.
 - **Follows Omarchy live:** watches `~/.config/omarchy/current/theme/colors.toml` and recolours immediately on theme switch without polling. Matches your terminal's `monospace` font and pixel size (Ghostty, Alacritty, kitty, or foot; 13px fallback).
-- **Zero chrome, tiling first:** no header or decorations, 360x200 minimum size, built to sit cleanly in a tile or float as a scratchpad.
+- **Zero chrome, tiling first:** no header or decorations, 360x200 minimum size, built to sit cleanly in a tile or float as a scratchpad. On a wide tile the text keeps a readable column of about 100 characters.
 - **Open and export:** load any UTF-8 plain-text file (up to 10 MiB, with confirmation) or export as Markdown with a date-stamped filename derived from your first line (for example `apikeys-14-11-2026.md`).
-- **Practical editor basics:** find with next/previous match, Tab / Shift+Tab indent that preserves undo, copy the full note in one chord, and a quiet mode line for save state and cursor position.
+- **Practical editor basics:** find with next/previous match, Tab / Shift+Tab indent that preserves undo, copy the full note in one chord, and a quiet mode line that shows only the save state, and a bar of shortcut keys (`^F`, `^O`, `^S`, `^⇧S`) that includes a Save button (`Ctrl+S`).
 - **Strictly offline:** no network access, no accounts, no telemetry. Your note lives in `~/.local/share/com.scratch.pad/records.sqlite3`, and native file dialogs run in Rust so the webview never sees filesystem paths.
 
 ## Install

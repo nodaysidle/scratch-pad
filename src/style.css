@@ -31,9 +31,9 @@ body { color: var(--fg); background: var(--bg); overflow: hidden; }
 #app { display: flex; flex-direction: column; height: 100%; }
 .app-content { position: relative; display: flex; flex: 1; flex-direction: column; min-height: 0; }
 
-/* The note fills the tile and clears rounded window corners. */
+/* The note fills the tile and clears rounded window corners. The inline padding keeps a wide tile's text to a readable ~100 characters; narrow tiles keep 18px. */
 .editor {
-  flex: 1; min-height: 0; width: 100%; padding: 16px 18px; scroll-padding-block: 24px;
+  flex: 1; min-height: 0; width: 100%; padding: 16px max(18px, calc((100% - 100ch) / 2)); scroll-padding-block: 24px;
   color: var(--fg); background: var(--bg); caret-color: var(--accent);
   border: 0; outline: 0; resize: none; font: inherit; line-height: 1.55;
   tab-size: 2; font-variant-ligatures: contextual;
@@ -88,7 +88,9 @@ body { color: var(--fg); background: var(--bg); overflow: hidden; }
 .status-bar .button { height: auto; padding: 2px 6px; color: var(--fg-dim); border-color: transparent; }
 .status-bar .button:hover:not(:disabled),
 .status-bar .button:focus-visible { color: var(--fg); background: var(--bg-raised); }
-.button[data-key]::before { content: attr(data-key); margin-right: 1ch; color: var(--fg); }
+.button[data-key]::before { content: attr(data-key); color: var(--fg); }
+/* Key hints only; the label stays in the DOM for the tooltip and screen readers. */
+.toolbar .button-label { display: none; }
 .muted { color: var(--fg-dim); }
 
 .error-banner {

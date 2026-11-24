@@ -111,7 +111,9 @@ describe("SingleNoteEditorFeature", () => {
     })
 
     expect(editor.textarea).toBe(document.querySelector('textarea[aria-label="Note"]'))
-    expect(editor.textarea.placeholder).toBe("Type here. The note saves as you type.")
+    expect(editor.textarea.placeholder).toBe(
+      "Type here. The note saves by itself.\nCtrl+F find · Ctrl+O open a file · Ctrl+S save now · Ctrl+Shift+S save as Markdown · Ctrl+Shift+C copy all",
+    )
   })
 
   it("shows empty text area and error banner with retry when initial load fails", async () => {

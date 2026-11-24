@@ -68,14 +68,26 @@ const reveal = (index: number): void => {
   editor.textarea.scrollTop = Math.max(0, top - editor.textarea.clientHeight / 2)
 }
 
-const modeLine = createModeLineFeature({ store, textarea: editor.textarea })
+const modeLine = createModeLineFeature({ store })
 const find = createFindFeature({ textarea: editor.textarea, reveal })
 // A replaced note (Ctrl+O) assigns textarea.value and fires no input event.
 store.subscribe(find.refresh)
 
+// Wraps the visible text so the stylesheet can hide it; the full name stays for screen readers and the tooltip.
+const labelled = (element: HTMLButtonElement, label: string, name: string, shortcut: string, hint: string): void => {
+  const text = document.createElement("span")
+  text.className = "button-label"
+  text.textContent = label
+  element.replaceChildren(text)
+  element.setAttribute("aria-label", name)
+  element.title = `${name} (${shortcut})`
+  element.dataset.key = hint
+}
+
 const findButton = button("Find", () => find.open())
-findButton.title = "Ctrl+F"
-findButton.dataset.key = "^F"
+labelled(findButton, "Find", "Find in note", "Ctrl+F", "^F")
+const saveNowButton = button("Save", () => void editor.flush())
+labelled(saveNowButton, "Save", "Save the note now", "Ctrl+S", "^S")
 
 const copyStatus = document.createElement("span")
 copyStatus.className = "copy-status"
@@ -100,13 +112,11 @@ const copyAll = (): void => {
   )
 }
 
-slots.mount("actions", findButton, openFeature.button, saveFeature.button)
+slots.mount("actions", findButton, openFeature.button, saveNowButton, saveFeature.button)
 slots.mount("status", modeLine.element, find.element, saveFeature.status, copyStatus)
 
-openFeature.button.title = "Ctrl+O"
-openFeature.button.dataset.key = "^O"
-saveFeature.button.title = "Ctrl+Shift+S"
-saveFeature.button.dataset.key = "^⇧S"
+labelled(openFeature.button, "Open", "Open text file", "Ctrl+O", "^O")
+labelled(saveFeature.button, "Export", "Save as Markdown", "Ctrl+Shift+S", "^⇧S")
 bindShortcuts(document, {
   open: () => void openFeature.openFile(),
   save: () => void editor.flush(),

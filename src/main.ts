@@ -105,11 +105,12 @@ slots.mount("status", modeLine.element, find.element, saveFeature.status, copySt
 
 openFeature.button.title = "Ctrl+O"
 openFeature.button.dataset.key = "^O"
-saveFeature.button.title = "Ctrl+S"
-saveFeature.button.dataset.key = "^S"
+saveFeature.button.title = "Ctrl+Shift+S"
+saveFeature.button.dataset.key = "^⇧S"
 bindShortcuts(document, {
   open: () => void openFeature.openFile(),
-  save: () => void saveFeature.saveMarkdown(),
+  save: () => void editor.flush(),
+  exportMarkdown: () => void saveFeature.saveMarkdown(),
   find: find.open,
   copyAll,
   dismissError: errors.dismiss,

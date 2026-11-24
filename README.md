@@ -18,7 +18,7 @@ Scratch Pad opens straight into your note with the cursor ready. There are no ta
 
 ## Highlights
 
-- **One note, saved automatically:** saves after 5 seconds of idle, when the window loses focus, and on close. If a closing save fails, the window stays open and tells you.
+- **One note, saved automatically:** saves after 10 seconds of idle, when you press `Ctrl+S`, when the window loses focus, and on close. If a closing save fails, the window stays open and tells you.
 - **Follows Omarchy live:** watches `~/.config/omarchy/current/theme/colors.toml` and recolours immediately on theme switch without polling. Matches your terminal's `monospace` font and pixel size (Ghostty, Alacritty, kitty, or foot; 13px fallback).
 - **Zero chrome, tiling first:** no header or decorations, 360x200 minimum size, built to sit cleanly in a tile or float as a scratchpad.
 - **Open and export:** load any UTF-8 plain-text file (up to 10 MiB, with confirmation) or export as Markdown with a date-stamped filename derived from your first line (for example `apikeys-14-11-2026.md`).
@@ -59,7 +59,8 @@ o.window({ class = "scratch-pad" }, { tag = "+floating-window" })
 | Key | Action |
 |---|---|
 | `Ctrl+O` | Open a plain-text file (replaces current note after confirmation; `Ctrl+Z` brings the old note back) |
-| `Ctrl+S` | Save note as Markdown |
+| `Ctrl+S` | Save the note now |
+| `Ctrl+Shift+S` | Save note as Markdown |
 | `Ctrl+F` | Find in note |
 | `Enter` / `Shift+Enter` | Next / previous match while find is open |
 | `Ctrl+Shift+C` | Copy entire note when nothing is selected |

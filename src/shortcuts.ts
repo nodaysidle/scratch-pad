@@ -2,6 +2,7 @@ export interface ShortcutActions {
   open: () => void
   save: () => void
   find: () => void
+  exportMarkdown?: () => void
   copyAll?: () => void
   dismissError?: () => void
 }
@@ -26,7 +27,7 @@ const hasActiveSelection = (target: Document): boolean => {
 }
 
 /**
- * Ctrl+O, Ctrl+S, Ctrl+F, Ctrl+Shift+C (when nothing is selected), and Esc (dismiss error banner).
+ * Ctrl+O, Ctrl+S (saves the note now), Ctrl+F, Ctrl+Shift+S (exports Markdown), Ctrl+Shift+C (when nothing is selected), and Esc (dismiss error banner).
  * Super is left alone: it belongs to the window manager.
  */
 export const bindShortcuts = (target: Document, actions: ShortcutActions): (() => void) => {
@@ -54,6 +55,10 @@ export const bindShortcuts = (target: Document, actions: ShortcutActions): (() =
     if (!event.ctrlKey || event.altKey || event.metaKey) return
 
     if (event.shiftKey) {
+      if (letterOf(event) === "s" && actions.exportMarkdown) {
+        event.preventDefault()
+        actions.exportMarkdown()
+      }
       if (letterOf(event) === "c" && actions.copyAll && !hasActiveSelection(target)) {
         event.preventDefault()
         actions.copyAll()

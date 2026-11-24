@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { createErrorBanner } from "../../src/errors"
 import { createSlots } from "../../src/store"
-import { createNoteStore, createSingleNoteEditorFeature, UNDOABLE_REPLACE_MAX, type Note } from "../../src/features/singlenoteeditorfeature"
+import { createNoteStore, createSingleNoteEditorFeature, IDLE_SAVE_MS, UNDOABLE_REPLACE_MAX, type Note } from "../../src/features/singlenoteeditorfeature"
 
 const createFakeTimers = () => {
   let now = 0
@@ -150,7 +150,7 @@ describe("SingleNoteEditorFeature", () => {
     expect(textarea.value).toBe("Recovered after retry")
   })
 
-  it("saves typed text 5000 ms after typing stops and debounces intermediate changes (ACC-SINGLE-NOTE-EDITOR-01, ACC-SINGLE-NOTE-EDITOR-02)", async () => {
+  it("saves typed text after the idle delay when typing stops and debounces intermediate changes (ACC-SINGLE-NOTE-EDITOR-01, ACC-SINGLE-NOTE-EDITOR-02)", async () => {
     const stored: Note[] = []
     const calls: Array<{ command: string; args: unknown }> = []
     const clock = createFakeTimers()
@@ -193,7 +193,13 @@ describe("SingleNoteEditorFeature", () => {
     clock.advance(500)
     expect(stored).toEqual([])
 
-    clock.advance(4500)
+    // 500 ms have passed since the last change: advance to one millisecond short of the delay, nothing is written.
+    clock.advance(IDLE_SAVE_MS - 501)
+    await flushMicrotasks()
+    expect(IDLE_SAVE_MS).toBe(10000)
+    expect(stored).toEqual([])
+
+    clock.advance(1)
     await flushMicrotasks()
 
     expect(stored).toEqual([{ id: 1, text: "First draft updated" }])
@@ -202,7 +208,7 @@ describe("SingleNoteEditorFeature", () => {
 
     textarea.value = "  leading and trailing  "
     textarea.dispatchEvent(new Event("input"))
-    clock.advance(5000)
+    clock.advance(IDLE_SAVE_MS)
     await flushMicrotasks()
 
     expect(stored).toEqual([{ id: 1, text: "  leading and trailing  " }])
@@ -211,7 +217,7 @@ describe("SingleNoteEditorFeature", () => {
 
     textarea.value = ""
     textarea.dispatchEvent(new Event("input"))
-    clock.advance(5000)
+    clock.advance(IDLE_SAVE_MS)
     await flushMicrotasks()
 
     expect(stored).toEqual([{ id: 1, text: "" }])
@@ -246,7 +252,7 @@ describe("SingleNoteEditorFeature", () => {
 
     textarea.value = "Unsaved new text"
     textarea.dispatchEvent(new Event("input"))
-    clock.advance(5000)
+    clock.advance(IDLE_SAVE_MS)
     await flushMicrotasks()
 
     expect(stored).toEqual([{ id: 1, text: "Initial saved" }])
@@ -301,7 +307,7 @@ describe("SingleNoteEditorFeature", () => {
     await flushMicrotasks()
 
     editor.setDraft("First")
-    clock.advance(5000)
+    clock.advance(IDLE_SAVE_MS)
     await flushMicrotasks()
     expect(resolveCreate).not.toBeNull()
 
@@ -313,6 +319,32 @@ describe("SingleNoteEditorFeature", () => {
 
     expect(stored).toEqual([{ id: 7, text: "Flushed while create in flight" }])
   })
+  it("flush() before the idle delay writes the text once and the delay then writes nothing more", async () => {
+    const calls: string[] = []
+    const clock = createFakeTimers()
+    const editor = createSingleNoteEditorFeature({
+      call: async <T>(command: string): Promise<T> => {
+        calls.push(command)
+        if (command === "list_note") return [] as unknown as T
+        if (command === "create_note") return { id: 1 } as unknown as T
+        throw new Error(`unexpected ${command}`)
+      },
+      errors: createErrorBanner(root),
+      store: createNoteStore(),
+      timers: clock.timers,
+    })
+    await flushMicrotasks()
+
+    editor.setDraft("Saved by hand")
+    clock.advance(1000)
+    expect(await editor.flush()).toBe(true)
+    expect(calls.filter(c => c === "create_note").length).toBe(1)
+
+    clock.advance(IDLE_SAVE_MS * 2)
+    await flushMicrotasks()
+    expect(calls.filter(c => c === "create_note" || c === "update_note").length).toBe(1)
+  })
+
   it("does not create a second note when the first load failed", async () => {
     const calls: Array<{ command: string; args: unknown }> = []
     let failList = true
@@ -340,7 +372,7 @@ describe("SingleNoteEditorFeature", () => {
 
     textarea.value = "typed"
     textarea.dispatchEvent(new Event("input"))
-    clock.advance(5000)
+    clock.advance(IDLE_SAVE_MS)
     await flushMicrotasks()
     expect(calls.filter(c => c.command === "create_note" || c.command === "update_note")).toEqual([])
 
@@ -386,7 +418,7 @@ describe("SingleNoteEditorFeature", () => {
     await flushMicrotasks()
     expect(textarea.value).toBe("Stored")
 
-    clock.advance(5000)
+    clock.advance(IDLE_SAVE_MS)
     await flushMicrotasks()
     expect(calls.filter(c => c.command === "create_note" || c.command === "update_note")).toEqual([])
   })
@@ -419,7 +451,7 @@ describe("SingleNoteEditorFeature", () => {
 
     await flushMicrotasks()
     editor.setDraft("New")
-    clock.advance(5000)
+    clock.advance(IDLE_SAVE_MS)
     await flushMicrotasks()
 
     expect(await editor.flush()).toBe(false)
@@ -458,7 +490,7 @@ describe("SingleNoteEditorFeature", () => {
     const textarea = document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Note"]')!
     textarea.value = "New"
     textarea.dispatchEvent(new Event("input"))
-    clock.advance(5000)
+    clock.advance(IDLE_SAVE_MS)
     await flushMicrotasks()
 
     const banner = document.querySelector<HTMLElement>(".error-banner")!
@@ -468,7 +500,7 @@ describe("SingleNoteEditorFeature", () => {
     failWrites = false
     textarea.value = "Newer"
     textarea.dispatchEvent(new Event("input"))
-    clock.advance(5000)
+    clock.advance(IDLE_SAVE_MS)
     await flushMicrotasks()
 
     expect(banner.hidden).toBe(true)
@@ -522,7 +554,7 @@ describe("SingleNoteEditorFeature", () => {
 
     textarea.value = "Original"
     textarea.dispatchEvent(new Event("input"))
-    clock.advance(5000)
+    clock.advance(IDLE_SAVE_MS)
     await flushMicrotasks()
 
     expect(calls.filter(c => c.command === "update_note")).toEqual([])
@@ -654,7 +686,7 @@ describe("SingleNoteEditorFeature", () => {
     editor.textarea.value = "one"
     editor.textarea.dispatchEvent(new Event("input"))
     expect(store.get().dirty).toBe(true)
-    clock.advance(5000)
+    clock.advance(IDLE_SAVE_MS)
     await flushMicrotasks()
     expect(store.get().note).toEqual([{ id: 7, text: "one" }])
     expect(store.get().dirty).toBe(false)

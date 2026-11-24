@@ -33,8 +33,8 @@ export const createNoteStore = () =>
     loadError: null,
   })
 
-/** The note is written after this long without typing, and at once on blur and close. */
-export const IDLE_SAVE_MS = 5000
+/** The note is written after this long without typing, and at once on Ctrl+S, blur and close. */
+export const IDLE_SAVE_MS = 10_000
 // The longest text (UTF-16 units) replaced through the undo history; above it the value is assigned directly,
 // because inserting many megabytes as one edit may stall the webview.
 export const UNDOABLE_REPLACE_MAX = 1_000_000

@@ -48,6 +48,30 @@ describe("bindShortcuts", () => {
     expect(actions.open).not.toHaveBeenCalled()
   })
 
+  it("Ctrl+Shift+S exports Markdown, prevents the default and does not save", () => {
+    const exportMarkdown = vi.fn()
+    const actions = setup({ exportMarkdown })
+    const event = press("S", { ctrlKey: true, shiftKey: true })
+    expect(exportMarkdown).toHaveBeenCalledTimes(1)
+    expect(actions.save).not.toHaveBeenCalled()
+    expect(event.defaultPrevented).toBe(true)
+  })
+
+  it("Ctrl+S does not export Markdown", () => {
+    const exportMarkdown = vi.fn()
+    const actions = setup({ exportMarkdown })
+    press("s", { ctrlKey: true })
+    expect(actions.save).toHaveBeenCalledTimes(1)
+    expect(exportMarkdown).not.toHaveBeenCalled()
+  })
+
+  it("Ctrl+Shift+S without an exportMarkdown action does nothing and is not prevented", () => {
+    const actions = setup()
+    const event = press("s", { ctrlKey: true, shiftKey: true })
+    expect(actions.save).not.toHaveBeenCalled()
+    expect(event.defaultPrevented).toBe(false)
+  })
+
   it("uses the physical key on a non-Latin layout, but a Latin key wins", () => {
     const actions = setup()
     press("ы", { ctrlKey: true, code: "KeyS" })

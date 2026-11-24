@@ -6,7 +6,7 @@ Define the product boundary, users, problems, goals, journeys, feature outcomes,
 
 ## Product Definition
 
-Scratch Pad is a single-note app: the user types into one text area, the text is saved automatically one second after typing stops, the text can be saved to a Markdown file the user chooses, a plain text file the user chooses can replace the text after confirmation, and the text is stored on the device and restored after restart.
+Scratch Pad is a single-note app: the user types into one text area, the text is saved automatically ten seconds after typing stops, the text can be saved to a Markdown file the user chooses, a plain text file the user chooses can replace the text after confirmation, and the text is stored on the device and restored after restart. Ctrl+S writes the note at once.
 
 ## Problem Statement
 
@@ -20,7 +20,7 @@ People who want one always-available scratch note for quick jottings need a focu
 ## Goals
 
 - Provide one text area for a single note
-- Persist the note automatically one second after typing stops
+- Persist the note automatically ten seconds after typing stops
 - Save the note to a user-chosen Markdown file
 - Replace the note from a user-chosen plain text file after confirmation
 - Restore the stored note after restart
@@ -36,7 +36,7 @@ People who want one always-available scratch note for quick jottings need a focu
 ### Single note editor outcome
 
 - Actor: People who want one always-available scratch note for quick jottings
-- Steps: The user types in the text area, or the app starts. → The main window shows exactly one text area holding the single note. On app start the stored note is loaded into the text area; if no note has been stored yet the text area is empty. Every keystroke updates the in-memory text, and one second after the last keystroke the full text is written to the device store, replacing the previous stored text. If the user types again before the one-second delay elapses, the pending save is restarted so only the latest text is written. The text area accepts any text including empty text; saving empty text stores an empty note. If loading the stored note fails, the text area is shown empty and one error message states the note could not be loaded.
+- Steps: The user types in the text area, or the app starts. → The main window shows exactly one text area holding the single note. On app start the stored note is loaded into the text area; if no note has been stored yet the text area is empty. Every keystroke updates the in-memory text, and ten seconds after the last keystroke the full text is written to the device store, replacing the previous stored text. If the user types again before the ten-second delay elapses, the pending save is restarted so only the latest text is written. The text area accepts any text including empty text; saving empty text stores an empty note. If loading the stored note fails, the text area is shown empty and one error message states the note could not be loaded.
 - Outcome: The user types freely in one text area and the note is kept on the device and restored after restart.
 
 ### Save note as Markdown file outcome
@@ -59,7 +59,7 @@ People who want one always-available scratch note for quick jottings need a focu
 
 ### FEAT-SINGLE-NOTE-EDITOR — Single note editor
 
-- Behavior: The main window shows exactly one text area holding the single note. On app start the stored note is loaded into the text area; if no note has been stored yet the text area is empty. Every keystroke updates the in-memory text, and one second after the last keystroke the full text is written to the device store, replacing the previous stored text. If the user types again before the one-second delay elapses, the pending save is restarted so only the latest text is written. The text area accepts any text including empty text; saving empty text stores an empty note. If loading the stored note fails, the text area is shown empty and one error message states the note could not be loaded.
+- Behavior: The main window shows exactly one text area holding the single note. On app start the stored note is loaded into the text area; if no note has been stored yet the text area is empty. Every keystroke updates the in-memory text, and ten seconds after the last keystroke the full text is written to the device store, replacing the previous stored text. If the user types again before the ten-second delay elapses, the pending save is restarted so only the latest text is written. The text area accepts any text including empty text; saving empty text stores an empty note. If loading the stored note fails, the text area is shown empty and one error message states the note could not be loaded.
 - Inputs: The user types in the text area, or the app starts.
 - Outputs: The user types freely in one text area and the note is kept on the device and restored after restart.
 - Acceptance outcomes: After typing text and advancing the injected clock by 1000 ms, reading the stored note returns exactly the typed text.; Typing more text 500 ms after a change and advancing the clock by 1000 ms stores only the latest text, not the intermediate text.; When the store write fails, the previously stored note read back is unchanged and the error message is shown.; With a stored note present, starting the app shows that stored text in the text area.
@@ -86,7 +86,7 @@ People who want one always-available scratch note for quick jottings need a focu
 
 ## Requirement Contracts
 
-- REQ-SINGLE-NOTE-EDITOR — The main window shows exactly one text area holding the single note. On app start the stored note is loaded into the text area; if no note has been stored yet the text area is empty. Every keystroke updates the in-memory text, and one second after the last keystroke the full text is written to the device store, replacing the previous stored text. If the user types again before the one-second delay elapses, the pending save is restarted so only the latest text is written. The text area accepts any text including empty text; saving empty text stores an empty note. If loading the stored note fails, the text area is shown empty and one error message states the note could not be loaded. Acceptance ACC-SINGLE-NOTE-EDITOR-01, ACC-SINGLE-NOTE-EDITOR-02, ACC-SINGLE-NOTE-EDITOR-03, ACC-SINGLE-NOTE-EDITOR-04: After typing text and advancing the injected clock by 1000 ms, reading the stored note returns exactly the typed text.; Typing more text 500 ms after a change and advancing the clock by 1000 ms stores only the latest text, not the intermediate text.; When the store write fails, the previously stored note read back is unchanged and the error message is shown.; With a stored note present, starting the app shows that stored text in the text area.
+- REQ-SINGLE-NOTE-EDITOR — The main window shows exactly one text area holding the single note. On app start the stored note is loaded into the text area; if no note has been stored yet the text area is empty. Every keystroke updates the in-memory text, and ten seconds after the last keystroke the full text is written to the device store, replacing the previous stored text. If the user types again before the ten-second delay elapses, the pending save is restarted so only the latest text is written. The text area accepts any text including empty text; saving empty text stores an empty note. If loading the stored note fails, the text area is shown empty and one error message states the note could not be loaded. Acceptance ACC-SINGLE-NOTE-EDITOR-01, ACC-SINGLE-NOTE-EDITOR-02, ACC-SINGLE-NOTE-EDITOR-03, ACC-SINGLE-NOTE-EDITOR-04: After typing text and advancing the injected clock by 1000 ms, reading the stored note returns exactly the typed text.; Typing more text 500 ms after a change and advancing the clock by 1000 ms stores only the latest text, not the intermediate text.; When the store write fails, the previously stored note read back is unchanged and the error message is shown.; With a stored note present, starting the app shows that stored text in the text area.
 - REQ-SAVE-NOTE-AS-MARKDOWN-FILE — Activating the control opens a Save panel where the user chooses the destination and file name; the suggested file name is the note's first line in lower case with its words joined, followed by the date as dd-mm-yyyy, for example apikeys-14-11-2026.md, or scratchpad-14-11-2026.md when the note has no usable first line. The file is written as Markdown with a level-one heading line '# Scratch Pad', one blank line, then the note text exactly as it appears in the text area, with no trailing newline added beyond the note text. The write replaces the whole file atomically so a failed write leaves any existing file at that location unchanged. On success a confirmation message states the file was saved. If the user cancels the Save panel nothing is written and no message is shown. Acceptance ACC-SAVE-NOTE-AS-MARKDOWN-FILE-01, ACC-SAVE-NOTE-AS-MARKDOWN-FILE-02, ACC-SAVE-NOTE-AS-MARKDOWN-FILE-03, ACC-SAVE-NOTE-AS-MARKDOWN-FILE-04: Cancelling the Save panel writes no file and shows no message.; Saving an empty note produces a file whose content is '# Scratch Pad\n\n'.; Saving a note whose text is 'Hello' produces a file whose content is '# Scratch Pad\n\nHello'.; When the write fails, a pre-existing file at the chosen location still has its previous content.
 - REQ-OPEN-PLAIN-TEXT-FILE-TO-REPLACE-NOTE — Activating the control opens an Open panel where the user chooses a plain text file. After a file is chosen, a confirmation dialog asks 'Replace the current note with the contents of this file?' with the labels Replace and Cancel. Choosing Cancel leaves the note text unchanged and writes nothing. Choosing Replace reads the file as UTF-8 text, puts that text into the text area, and immediately stores it as the note, replacing the previous stored text. If the file cannot be read as UTF-8 text, the note text is left unchanged and one error message states the file could not be opened. Acceptance ACC-OPEN-PLAIN-TEXT-FILE-TO-REPLACE-NOTE-01, ACC-OPEN-PLAIN-TEXT-FILE-TO-REPLACE-NOTE-02, ACC-OPEN-PLAIN-TEXT-FILE-TO-REPLACE-NOTE-03: Choosing Cancel in the confirmation dialog leaves the text area and the stored note unchanged.; Confirming Replace with a file containing 'Draft two' leaves the text area showing 'Draft two' and reading the stored note returns 'Draft two'.; When the chosen file cannot be read, the text area and the stored note keep their previous values and the error message is shown.
 
@@ -96,7 +96,7 @@ People who want one always-available scratch note for quick jottings need a focu
 
 ## UX Requirements
 
-- The automatic save writes the full note text one second after the last keystroke, with no partial text written.
+- The automatic save writes the full note text ten seconds after the last keystroke, with no partial text written.
 - The stored note is restored into the text area when the app starts.
 - Text typed within the last second before the window is closed is written before the app exits.
 
@@ -115,7 +115,7 @@ People who want one always-available scratch note for quick jottings need a focu
 ## Success Criteria
 
 - Provide one text area for a single note
-- Persist the note automatically one second after typing stops
+- Persist the note automatically ten seconds after typing stops
 - Save the note to a user-chosen Markdown file
 - Replace the note from a user-chosen plain text file after confirmation
 - Restore the stored note after restart

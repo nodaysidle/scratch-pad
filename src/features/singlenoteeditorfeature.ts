@@ -81,7 +81,6 @@ export const createSingleNoteEditorFeature = (
   textarea.className = "editor"
   textarea.setAttribute("aria-label", "Note")
   textarea.spellcheck = false
-  textarea.placeholder = "Type here. The note saves by itself.\nCtrl+F find · Ctrl+O open a file · Ctrl+S save now · Ctrl+Shift+S save as Markdown · Ctrl+Shift+C copy all"
   textarea.readOnly = true
 
   const statusBar = document.createElement("footer")

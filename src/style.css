@@ -31,9 +31,9 @@ body { color: var(--fg); background: var(--bg); overflow: hidden; }
 #app { display: flex; flex-direction: column; height: 100%; }
 .app-content { position: relative; display: flex; flex: 1; flex-direction: column; min-height: 0; }
 
-/* The note fills the tile and clears rounded window corners. The inline padding keeps a wide tile's text to a readable ~100 characters; narrow tiles keep 18px. */
+/* The note fills the tile and clears rounded window corners. Text starts at the left edge at every width. */
 .editor {
-  flex: 1; min-height: 0; width: 100%; padding: 16px max(18px, calc((100% - 100ch) / 2)); scroll-padding-block: 24px;
+  flex: 1; min-height: 0; width: 100%; padding: 16px 18px; scroll-padding-block: 24px;
   color: var(--fg); background: var(--bg); caret-color: var(--accent);
   border: 0; outline: 0; resize: none; font: inherit; line-height: 1.55;
   tab-size: 2; font-variant-ligatures: contextual;
@@ -43,7 +43,6 @@ body { color: var(--fg); background: var(--bg); overflow: hidden; }
 .editor::-webkit-scrollbar-track { background: transparent; }
 .editor::-webkit-scrollbar-thumb { background: var(--line); }
 .editor::-webkit-scrollbar-thumb:hover { background: var(--fg-dim); }
-.editor::placeholder { color: var(--fg-dim); }
 /* An off-screen copy of the note's text, used to measure where a match sits; inherits .editor metrics. */
 .editor-mirror {
   position: absolute; top: 0; left: 0; visibility: hidden; flex: none; height: auto; min-height: 0;

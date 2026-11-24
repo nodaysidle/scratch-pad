@@ -42,7 +42,7 @@ Only three colours are taken from the theme (`background`, `foreground`, `accent
 
 - **Saves by itself.** After 10 seconds without typing, when the window loses focus, and when it closes. `Ctrl+S` saves at once. If a closing save fails, the window stays open and says so.
 - **Stays out of the way.** No header, no decorations, no settings. The bar shows the save state and four keys: `^F` find, `^O` open, `^S` save, `^⇧S` export.
-- **Reads well at any size.** On a wide tile the text keeps a centred column of about 100 characters; in a small floating window (down to 360x200) it uses every pixel.
+- **Fits any tile.** The text starts at the left edge and fills the window, from a full-screen tile down to a small floating window (360x200).
 - **Edits like an editor.** Tab and Shift+Tab indent, Enter keeps the indent and continues `-`, `1.` and `- [ ]` lists, and undo survives all of it.
 - **Finds as you type.** `Ctrl+F` starts from the selected text and jumps to the first match while you type.
 - **Opens and exports.** Load any UTF-8 text file (up to 10 MiB) into the note, and `Ctrl+Z` brings the old note back. Export as Markdown with a name taken from your first line and the date, such as `apikeys-14-11-2026.md`.

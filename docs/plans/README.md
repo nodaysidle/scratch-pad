@@ -17,10 +17,20 @@ done (unless a reviewer dispatched you and maintains this index).
 | 006 | Mode line and find in note | P2 | M | 005 | DONE (reviewed + driven in offscreen WebKit; branch `advisor/006-mode-line-and-find` at `8c2b018`, includes 005, merged) |
 | 007 | App icon and `--install-binary` (launcher entry named `scratch-pad`) | P2 | S | — | DONE (reviewed; merged) |
 | 008 | Export file name from the note and the date (words joined, `apikeys-14-11-2026.md`) | P2 | S | — | DONE (reviewed after two revision rounds; merged, `master` at `5781cf3`; installed) |
+| 009 | Keys go to the right layer (Esc, Enter on buttons, non-Latin layouts, find count) | P1 | S | — | TODO |
+| 010 | Backend: parented dialogs, distinct open errors, tests that check what they claim | P1 | M | — | TODO |
+| 011 | Opening a file can be undone with Ctrl+Z; a failed open says why | P1 | S | — | TODO |
+| 012 | Enter keeps the indent and continues a list | P2 | S | 011 (same file) | TODO |
+| 013 | Find starts from the selection, jumps as you type, says when it wraps | P2 | S-M | 009 | TODO |
+| 014 | A slow theme re-read never overwrites a newer pushed theme | P2 | S | — | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale — finding fixed independently or approach abandoned)
 
 ## Dependency notes
+
+- Plans 009-014 were written on 2026-11-24 against commit `bb5a1a2`, after a review of `1f3ecfa..bb5a1a2`.
+  They run as three chains with no shared files: 009 then 013 (find and shortcuts), 011 then 012 (editor and
+  open flow, plus `README.md`), 010 then 014 (Rust, and `src/omarchy.ts`).
 
 - 001 and 002 touch different files and can run in parallel.
 - 003 requires 001 because it appends sections to the README that 001 writes.
@@ -55,6 +65,12 @@ owner's real note and desktop theme are never touched:
   (AppImage, `StartupWMClass=com.scratch.pad`).
 
 ## Findings considered and rejected
+
+- (2026-11-24) One keydown dispatcher for all layers: plan 009 fixes the two real bugs with `defaultPrevented`; revisit with a fourth overlay.
+- (2026-11-24) Listeners never removed (focus, shortcuts, find, mode line): they belong to app-lifetime singletons.
+- (2026-11-24) Specs say autosave after one second, code and README say five (`docs/specs/PRD.md:23`, `singlenoteeditorfeature.ts:37`): the owner decides which is right; not planned.
+- (2026-11-24) Needs a real launch before it is a finding: a second launch may not focus the window on Hyprland (no activation token in `lifecyclecoordinator.rs`).
+- (2026-11-24) Quality-of-life candidates not planned: dim text contrast on some themes (`style.css:14`), focus back to the note after a click on Open/Save, word count in the mode line, key-hint-only bar at 360x200, shortcut hints in the empty note.
 
 - Poisoned-mutex recovery in the commands: no code inside the lock can panic.
 - Refusing a schema newer than the binary: only one migration exists; revisit with the second.

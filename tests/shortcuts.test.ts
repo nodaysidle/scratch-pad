@@ -48,6 +48,15 @@ describe("bindShortcuts", () => {
     expect(actions.open).not.toHaveBeenCalled()
   })
 
+  it("uses the physical key on a non-Latin layout, but a Latin key wins", () => {
+    const actions = setup()
+    press("ы", { ctrlKey: true, code: "KeyS" })
+    expect(actions.save).toHaveBeenCalledTimes(1)
+    press("s", { ctrlKey: true, code: "KeyO" })
+    expect(actions.save).toHaveBeenCalledTimes(2)
+    expect(actions.open).not.toHaveBeenCalled()
+  })
+
   it("ignores other combinations and does not prevent default", () => {
     const actions = setup()
     const events = [

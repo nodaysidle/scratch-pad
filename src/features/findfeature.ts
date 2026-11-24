@@ -78,6 +78,8 @@ export interface FindDeps {
 export interface FindFeature {
   element: HTMLElement
   open: () => void
+  /** Recounts when the note's text changed without an input event (a replaced note). */
+  refresh: () => void
   destroy: () => void
 }
 
@@ -115,9 +117,14 @@ export const createFindFeature = (deps: FindDeps): FindFeature => {
   const describe = (total: number): string =>
     !input.value ? "" : total === 0 ? "No matches" : total === 1 ? "1 match" : `${total} matches`
 
+  let countedText = ""
   const refreshCount = (): void => {
+    countedText = deps.textarea.value
     count.textContent = describe(findMatches(deps.textarea.value, input.value).length)
   }
+
+  // Where the search started: typing jumps to the first match at or after it.
+  let anchor = 0
 
   const step = (backwards: boolean): void => {
     const ranges = findMatchRanges(deps.textarea.value, input.value)
@@ -129,13 +136,15 @@ export const createFindFeature = (deps: FindDeps): FindFeature => {
     // Going forwards starts after the current selection, so a repeated Enter moves on.
     const cursor = backwards ? deps.textarea.selectionStart : deps.textarea.selectionEnd
     const selected = deps.textarea.selectionEnd > deps.textarea.selectionStart
-    const index = stepFrom(starts, selected || backwards ? cursor : deps.textarea.selectionStart, backwards)
+    const from = selected || backwards ? cursor : deps.textarea.selectionStart
+    const index = stepFrom(starts, from, backwards)
     const range = ranges[index]
     if (!range) return
+    const wrapped = ranges.length > 1 && (backwards ? range.start >= from : range.start < from)
     deps.textarea.focus()
     deps.textarea.setSelectionRange(range.start, range.end)
     deps.reveal(range.start)
-    count.textContent = `${index + 1} of ${ranges.length}`
+    count.textContent = `${index + 1} of ${ranges.length}${wrapped ? " (wrapped)" : ""}`
   }
 
   const close = (): void => {
@@ -149,7 +158,24 @@ export const createFindFeature = (deps: FindDeps): FindFeature => {
 
   element.append(label, input, prevButton, nextButton, count, closeButton)
 
-  input.addEventListener("input", refreshCount)
+  // Typing previews the first match from where find was opened; focus stays in the field.
+  input.addEventListener("input", () => {
+    countedText = deps.textarea.value
+    const ranges = findMatchRanges(deps.textarea.value, input.value)
+    if (!input.value) {
+      deps.textarea.setSelectionRange(anchor, anchor)
+      count.textContent = ""
+      return
+    }
+    const range = ranges[stepFrom(ranges.map(r => r.start), anchor, false)]
+    if (!range) {
+      count.textContent = describe(0)
+      return
+    }
+    deps.textarea.setSelectionRange(range.start, range.end)
+    deps.reveal(range.start)
+    count.textContent = `${ranges.indexOf(range) + 1} of ${ranges.length}`
+  })
 
   const onTextareaInput = (): void => {
     if (!element.hidden) refreshCount()
@@ -160,10 +186,13 @@ export const createFindFeature = (deps: FindDeps): FindFeature => {
   // would replace the selected match with a line break.
   const onDocumentKeyDown = (event: KeyboardEvent): void => {
     if (element.hidden || document.querySelector(".dialog-overlay")) return
+    if (event.isComposing) return
     if (event.key === "Escape") {
       event.preventDefault()
       close()
     } else if (event.key === "Enter" && !event.ctrlKey && !event.altKey && !event.metaKey) {
+      // Enter on a focused button presses that button.
+      if (event.target instanceof HTMLButtonElement) return
       event.preventDefault()
       step(event.shiftKey)
     }
@@ -173,10 +202,17 @@ export const createFindFeature = (deps: FindDeps): FindFeature => {
   return {
     element,
     open: () => {
+      const picked = deps.textarea.value.slice(deps.textarea.selectionStart, deps.textarea.selectionEnd)
+      if (picked && picked.length <= 200 && !/[\r\n]/.test(picked)) input.value = picked
+      anchor = deps.textarea.selectionStart
       element.hidden = false
       input.focus()
       input.select()
       refreshCount()
+    },
+    // The equality guard keeps a store notification (save state only) from overwriting "2 of 3".
+    refresh: () => {
+      if (!element.hidden && deps.textarea.value !== countedText) refreshCount()
     },
     destroy: () => {
       document.removeEventListener("keydown", onDocumentKeyDown)

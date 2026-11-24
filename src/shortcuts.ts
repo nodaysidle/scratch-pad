@@ -6,6 +6,14 @@ export interface ShortcutActions {
   dismissError?: () => void
 }
 
+// On a non-Latin layout event.key is that layout's letter; the physical key still says which shortcut.
+const letterOf = (event: KeyboardEvent): string =>
+  /^[a-z]$/i.test(event.key)
+    ? event.key.toLowerCase()
+    : event.code?.startsWith("Key")
+      ? event.code.slice(3).toLowerCase()
+      : ""
+
 const hasActiveSelection = (target: Document): boolean => {
   if (typeof window !== "undefined" && (window.getSelection()?.toString() ?? "").length > 0) {
     return true
@@ -33,6 +41,8 @@ export const bindShortcuts = (target: Document, actions: ShortcutActions): (() =
       !event.shiftKey &&
       !event.metaKey
     ) {
+      // Another layer (find) already took this Esc.
+      if (event.defaultPrevented) return
       if (target.querySelector(".find-bar:not([hidden])")) return
       if (target.querySelector(".error-banner:not([hidden])") && actions.dismissError) {
         event.preventDefault()
@@ -44,14 +54,14 @@ export const bindShortcuts = (target: Document, actions: ShortcutActions): (() =
     if (!event.ctrlKey || event.altKey || event.metaKey) return
 
     if (event.shiftKey) {
-      if (event.key.toLowerCase() === "c" && actions.copyAll && !hasActiveSelection(target)) {
+      if (letterOf(event) === "c" && actions.copyAll && !hasActiveSelection(target)) {
         event.preventDefault()
         actions.copyAll()
       }
       return
     }
 
-    const action = { o: actions.open, s: actions.save, f: actions.find }[event.key.toLowerCase()]
+    const action = { o: actions.open, s: actions.save, f: actions.find }[letterOf(event)]
     if (!action) return
     event.preventDefault()
     action()

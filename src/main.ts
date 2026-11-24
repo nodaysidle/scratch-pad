@@ -70,6 +70,8 @@ const reveal = (index: number): void => {
 
 const modeLine = createModeLineFeature({ store, textarea: editor.textarea })
 const find = createFindFeature({ textarea: editor.textarea, reveal })
+// A replaced note (Ctrl+O) assigns textarea.value and fires no input event.
+store.subscribe(find.refresh)
 
 const findButton = button("Find", () => find.open())
 findButton.title = "Ctrl+F"

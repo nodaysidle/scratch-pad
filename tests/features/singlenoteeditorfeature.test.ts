@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { createErrorBanner } from "../../src/errors"
 import { createSlots } from "../../src/store"
-import { createNoteStore, createSingleNoteEditorFeature, type Note } from "../../src/features/singlenoteeditorfeature"
+import { createNoteStore, createSingleNoteEditorFeature, UNDOABLE_REPLACE_MAX, type Note } from "../../src/features/singlenoteeditorfeature"
 
 const createFakeTimers = () => {
   let now = 0
@@ -731,5 +731,165 @@ describe("SingleNoteEditorFeature", () => {
     } finally {
       document.execCommand = original
     }
+  })
+
+  describe("replaceNote", () => {
+    const setupReplace = async () => {
+      const store = createNoteStore()
+      const updates: string[] = []
+      const editor = createSingleNoteEditorFeature({
+        call: async <T>(command: string, args?: Record<string, unknown>): Promise<T> => {
+          if (command === "list_note") return [{ id: 1, text: "old" }] as unknown as T
+          if (command === "update_note") {
+            updates.push((args?.input as { text: string }).text)
+            return undefined as unknown as T
+          }
+          throw new Error(`unexpected ${command}`)
+        },
+        errors: createErrorBanner(root),
+        store,
+        timers: createFakeTimers().timers,
+      })
+      await flushMicrotasks()
+      return { editor, store, updates, textarea: editor.textarea }
+    }
+
+    const withExec = async (
+      exec: (command: string, ui?: boolean, text?: string) => boolean,
+      body: () => Promise<void>,
+    ) => {
+      const original = document.execCommand
+      document.execCommand = exec as unknown as typeof document.execCommand
+      try {
+        await body()
+      } finally {
+        document.execCommand = original
+      }
+    }
+
+    it("replaces through execCommand as one undoable edit and saves once", async () => {
+      const { editor, store, updates, textarea } = await setupReplace()
+      const exec = vi.fn((_c: string, _u?: boolean, text?: string) => {
+        textarea.setRangeText(text ?? "", 0, textarea.value.length, "end")
+        textarea.dispatchEvent(new Event("input"))
+        return true
+      })
+      await withExec(exec, async () => {
+        await editor.replaceNote("new text")
+        expect(exec).toHaveBeenCalledTimes(1)
+        expect(exec).toHaveBeenCalledWith("insertText", false, "new text")
+        expect(textarea.value).toBe("new text")
+        expect(store.get().draft).toBe("new text")
+        expect([textarea.selectionStart, textarea.selectionEnd]).toEqual([0, 0])
+      })
+      expect(updates).toEqual(["new text"])
+    })
+
+    it("assigns the value and saves once when execCommand does not exist", async () => {
+      const { editor, updates, textarea } = await setupReplace()
+      await editor.replaceNote("new text")
+      expect(textarea.value).toBe("new text")
+      expect(updates).toEqual(["new text"])
+    })
+
+    it("falls back to assigning when execCommand returns true but changes nothing", async () => {
+      const { editor, updates, textarea } = await setupReplace()
+      await withExec(() => true, async () => {
+        await editor.replaceNote("new text")
+      })
+      expect(textarea.value).toBe("new text")
+      expect(updates).toEqual(["new text"])
+    })
+
+    it("never calls execCommand for a text above the undo limit", async () => {
+      const { editor, updates, textarea } = await setupReplace()
+      const exec = vi.fn(() => true)
+      const big = "x".repeat(UNDOABLE_REPLACE_MAX + 1)
+      await withExec(exec, async () => {
+        await editor.replaceNote(big)
+      })
+      expect(exec).not.toHaveBeenCalled()
+      expect(textarea.value).toBe(big)
+      expect(updates).toEqual([big])
+    })
+
+    it("replaces with an empty text through execCommand delete", async () => {
+      const { editor, textarea } = await setupReplace()
+      const exec = vi.fn((command: string) => {
+        if (command === "delete") {
+          textarea.value = ""
+          textarea.dispatchEvent(new Event("input"))
+        }
+        return true
+      })
+      await withExec(exec, async () => {
+        await editor.replaceNote("")
+      })
+      expect(exec).toHaveBeenCalledWith("delete")
+      expect(textarea.value).toBe("")
+    })
+  })
+
+  describe("Enter", () => {
+    const setupEnter = async (text: string, loaded = true) => {
+      const store = createNoteStore()
+      const editor = createSingleNoteEditorFeature({
+        call: async <T>(command: string): Promise<T> => {
+          if (command === "list_note") {
+            return (loaded ? [{ id: 1, text }] : new Promise(() => {})) as unknown as T
+          }
+          throw new Error(`unexpected ${command}`)
+        },
+        errors: createErrorBanner(root),
+        store,
+        timers: createFakeTimers().timers,
+      })
+      await flushMicrotasks()
+      const textarea = editor.textarea
+      textarea.setSelectionRange(text.length, text.length)
+      const press = (init: KeyboardEventInit = {}) => {
+        const event = new KeyboardEvent("keydown", { key: "Enter", cancelable: true, ...init })
+        textarea.dispatchEvent(event)
+        return event
+      }
+      return { textarea, press }
+    }
+
+    it("keeps the indent of the current line", async () => {
+      const { textarea, press } = await setupEnter("  abc")
+      expect(press().defaultPrevented).toBe(true)
+      expect(textarea.value).toBe("  abc\n  ")
+    })
+
+    it("leaves a line without indent to the browser", async () => {
+      const { textarea, press } = await setupEnter("abc")
+      expect(press().defaultPrevented).toBe(false)
+      expect(textarea.value).toBe("abc")
+    })
+
+    it("stands aside while the find bar is open, and not when it is hidden", async () => {
+      const { textarea, press } = await setupEnter("  abc")
+      const bar = document.createElement("div")
+      bar.className = "find-bar"
+      document.body.append(bar)
+      expect(press().defaultPrevented).toBe(false)
+      expect(textarea.value).toBe("  abc")
+      bar.hidden = true
+      expect(press().defaultPrevented).toBe(true)
+      expect(textarea.value).toBe("  abc\n  ")
+    })
+
+    it("ignores Shift+Enter and Enter during composition", async () => {
+      const { textarea, press } = await setupEnter("  abc")
+      expect(press({ shiftKey: true }).defaultPrevented).toBe(false)
+      expect(press({ isComposing: true }).defaultPrevented).toBe(false)
+      expect(textarea.value).toBe("  abc")
+    })
+
+    it("ignores Enter while the note is read-only", async () => {
+      const { textarea, press } = await setupEnter("  abc", false)
+      expect(textarea.readOnly).toBe(true)
+      expect(press().defaultPrevented).toBe(false)
+    })
   })
 })

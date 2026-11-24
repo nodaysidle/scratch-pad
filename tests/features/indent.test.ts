@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { indentEdit, lineBlock, outdentEdit } from "../../src/features/indent"
+import { enterEdit, indentEdit, lineBlock, outdentEdit } from "../../src/features/indent"
 
 const apply = (value: string, edit: { from: number; to: number; text: string }): string =>
   value.slice(0, edit.from) + edit.text + value.slice(edit.to)
@@ -43,5 +43,41 @@ describe("outdentEdit", () => {
     const edit = outdentEdit("  ab", 4, 4)!
     expect(apply("  ab", edit)).toBe("ab")
     expect([edit.selStart, edit.selEnd]).toEqual([2, 2])
+  })
+})
+
+describe("enterEdit", () => {
+  // "|" marks the caret in the input; returns the text after the edit, with "|" at the new caret, or null.
+  const run = (input: string): string | null => {
+    const start = input.indexOf("|")
+    const value = input.replace("|", "")
+    const edit = enterEdit(value, start, start)
+    if (!edit) return null
+    const out = apply(value, edit)
+    return out.slice(0, edit.selStart) + "|" + out.slice(edit.selEnd)
+  }
+
+  it.each([
+    ["abc|", null],
+    ["  abc|", "  abc\n  |"],
+    ["\tabc|", "\tabc\n\t|"],
+    ["  ab|c", "  ab\n  |c"],
+    [" | abc", " \n | abc"],
+    ["- one|", "- one\n- |"],
+    ["  * one|", "  * one\n  * |"],
+    ["9. nine|", "9. nine\n10. |"],
+    ["1) a|", "1) a\n2) |"],
+    ["- [x] done|", "- [x] done\n- [ ] |"],
+    ["- |", "|"],
+    ["  - |", "  |"],
+    ["-| one", null],
+    ["a\n  b|", "a\n  b\n  |"],
+  ])("%j", (input, expected) => {
+    expect(run(input)).toBe(expected)
+  })
+
+  it("replaces a selection by a newline and the indent", () => {
+    const edit = enterEdit("  abc", 3, 5)!
+    expect(apply("  abc", edit)).toBe("  a\n  ")
   })
 })

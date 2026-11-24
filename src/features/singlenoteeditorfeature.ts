@@ -1,7 +1,7 @@
 import type { call as apiCall } from "../api"
 import type { createErrorBanner } from "../errors"
 import { createSlots, createStore } from "../store"
-import { indentEdit, outdentEdit, type IndentEdit } from "./indent"
+import { enterEdit, indentEdit, outdentEdit, type IndentEdit } from "./indent"
 
 export interface Note {
   id: number
@@ -35,6 +35,9 @@ export const createNoteStore = () =>
 
 /** The note is written after this long without typing, and at once on blur and close. */
 export const IDLE_SAVE_MS = 5000
+// The longest text (UTF-16 units) replaced through the undo history; above it the value is assigned directly,
+// because inserting many megabytes as one edit may stall the webview.
+export const UNDOABLE_REPLACE_MAX = 1_000_000
 
 export const store = createNoteStore()
 export const slots = createSlots()
@@ -171,16 +174,30 @@ export const createSingleNoteEditorFeature = (
     }, IDLE_SAVE_MS)
   }
 
+  // Replaces the whole note as one undoable edit. False when the textarea did not take it (no execCommand,
+  // a refusal, or a text too long), and the caller then assigns the value.
+  const insertWhole = (text: string): boolean => {
+    if (text.length > UNDOABLE_REPLACE_MAX || typeof document.execCommand !== "function") return false
+    textarea.focus()
+    textarea.select()
+    const done = text === "" ? document.execCommand("delete") : document.execCommand("insertText", false, text)
+    // The input event has run setDraft by now; anything else means the edit did not land.
+    return done && textarea.value === text.replace(/\r\n?/g, "\n") && deps.store.get().draft === textarea.value
+  }
+
   const replaceNote = (text: string): Promise<boolean> => {
     if (!loaded) {
       deps.errors.show("The note could not be loaded.", retryLoad)
       return Promise.resolve(false)
     }
+    const inserted = insertWhole(text)
     if (pendingTimer !== null) {
       deps.timers.clear(pendingTimer)
       pendingTimer = null
     }
-    deps.store.set({ draft: text, dirty: true })
+    if (!inserted) deps.store.set({ draft: text, dirty: true })
+    textarea.setSelectionRange(0, 0)
+    textarea.scrollTop = 0
     return saveDraft()
   }
 
@@ -231,6 +248,24 @@ export const createSingleNoteEditorFeature = (
       if (target) {
         event.preventDefault()
         target.focus()
+      }
+      return
+    }
+
+    if (event.key === "Enter") {
+      if (
+        textarea.readOnly ||
+        event.ctrlKey || event.altKey || event.metaKey || event.shiftKey ||
+        event.isComposing ||
+        // The find bar owns Enter (next match) while it is open.
+        document.querySelector(".find-bar:not([hidden])")
+      ) {
+        return
+      }
+      const edit = enterEdit(textarea.value, textarea.selectionStart, textarea.selectionEnd)
+      if (edit) {
+        event.preventDefault()
+        applyEdit(edit)
       }
       return
     }

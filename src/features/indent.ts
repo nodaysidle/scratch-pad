@@ -71,3 +71,35 @@ export const outdentEdit = (value: string, start: number, end: number): IndentEd
     selEnd: Math.max(selStart, selEnd),
   }
 }
+
+const MARKER = /^(?:([-*+]) (?:\[[ xX]\] )?|(\d+)([.)]) )/
+
+/** What Enter inserts: a newline plus the line's indent and list marker. Null leaves the key to the browser. */
+export const enterEdit = (value: string, start: number, end: number): IndentEdit | null => {
+  const lineStart = start === 0 ? 0 : value.lastIndexOf("\n", start - 1) + 1
+  const nl = value.indexOf("\n", start)
+  const lineEnd = nl === -1 ? value.length : nl
+  const line = value.slice(lineStart, lineEnd)
+  const leading = /^[ \t]*/.exec(line)![0]
+  const match = MARKER.exec(line.slice(leading.length))
+  const marker = match ? match[0] : ""
+  const contentStart = lineStart + leading.length
+
+  if (start === end && marker && line === leading + marker) {
+    return { from: contentStart, to: lineEnd, text: "", selStart: contentStart, selEnd: contentStart }
+  }
+
+  let carried: string
+  if (start < contentStart) {
+    carried = value.slice(lineStart, start)
+  } else if (!match || start < contentStart + marker.length) {
+    carried = leading
+  } else if (match[1]) {
+    // A checkbox always continues unchecked.
+    carried = leading + match[1] + " " + (/\[/.test(marker) ? "[ ] " : "")
+  } else {
+    carried = leading + String(Number(match[2]) + 1) + match[3] + " "
+  }
+  if (carried === "") return null
+  return { from: start, to: end, text: "\n" + carried, selStart: start + 1 + carried.length, selEnd: start + 1 + carried.length }
+}

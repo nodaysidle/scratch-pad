@@ -58,12 +58,13 @@ o.window({ class = "scratch-pad" }, { tag = "+floating-window" })
 
 | Key | Action |
 |---|---|
-| `Ctrl+O` | Open a plain-text file (replaces current note after confirmation) |
+| `Ctrl+O` | Open a plain-text file (replaces current note after confirmation; `Ctrl+Z` brings the old note back) |
 | `Ctrl+S` | Save note as Markdown |
 | `Ctrl+F` | Find in note |
 | `Enter` / `Shift+Enter` | Next / previous match while find is open |
 | `Ctrl+Shift+C` | Copy entire note when nothing is selected |
 | `Tab` / `Shift+Tab` | Indent / outdent current line or selection |
+| `Enter` | New line with the same indent; continues `-`, `*`, `+`, `1.` and `- [ ]` lists (Enter on an empty item ends the list) |
 | `F6` | Toggle focus between the note and the mode line |
 | `Esc` | Close find, cancel confirmation, or dismiss an error banner |
 

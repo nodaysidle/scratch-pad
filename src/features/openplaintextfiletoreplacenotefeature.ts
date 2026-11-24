@@ -6,6 +6,18 @@ import type {
   createNoteStore,
   SingleNoteEditor,
 } from "./singlenoteeditorfeature"
+import { UNDOABLE_REPLACE_MAX } from "./singlenoteeditorfeature"
+
+const OPEN_FAILED = "The file could not be opened."
+
+// A failed command carries a message written for the user; anything else (a runtime error) gets the general one.
+const reasonFor = (error: unknown): string => {
+  const candidate = error as { kind?: unknown; message?: unknown } | null
+  return typeof candidate === "object" && candidate !== null &&
+    typeof candidate.kind === "string" && typeof candidate.message === "string"
+    ? candidate.message
+    : OPEN_FAILED
+}
 
 export interface OpenPlainTextFileDeps {
   call: typeof apiCall
@@ -23,8 +35,12 @@ export interface OpenPlainTextFileFeature {
 export const createOpenPlainTextFileToReplaceNoteFeature = (
   deps: OpenPlainTextFileDeps,
 ): OpenPlainTextFileFeature => {
-  const question = "Replace the current note with the contents of this file?"
+  const questionFor = (text: string): string =>
+    text.length <= UNDOABLE_REPLACE_MAX
+      ? "Replace the current note with the contents of this file? Ctrl+Z brings the old note back until you close the app."
+      : "Replace the current note with the contents of this file? The file is large, so this cannot be undone."
   let busy = false
+  let lastMessage = OPEN_FAILED
 
   // Rust shows the file dialog and reads the chosen file in one step, so no path reaches this code.
   const openFile = async (): Promise<void> => {
@@ -33,11 +49,12 @@ export const createOpenPlainTextFileToReplaceNoteFeature = (
     try {
       const text = await deps.call<string | null>("open_text_file")
       if (text === null) return
-      deps.errors.clear("The file could not be opened.")
-      if (!(await deps.confirm(question, "Replace"))) return
+      deps.errors.clear(lastMessage)
+      if (!(await deps.confirm(questionFor(text), "Replace"))) return
       await deps.editor.replaceNote(text)
-    } catch {
-      deps.errors.show("The file could not be opened.", () => void openFile())
+    } catch (error) {
+      lastMessage = reasonFor(error)
+      deps.errors.show(lastMessage, () => void openFile())
     } finally {
       busy = false
     }

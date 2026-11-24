@@ -5,6 +5,7 @@ import {
   createNoteStore,
   type SingleNoteEditor,
 } from "../../src/features/singlenoteeditorfeature"
+import { UNDOABLE_REPLACE_MAX } from "../../src/features/singlenoteeditorfeature"
 import { createOpenPlainTextFileToReplaceNoteFeature } from "../../src/features/openplaintextfiletoreplacenotefeature"
 
 const flushMicrotasks = async () => {
@@ -13,7 +14,10 @@ const flushMicrotasks = async () => {
   }
 }
 
-const question = "Replace the current note with the contents of this file?"
+const question =
+  "Replace the current note with the contents of this file? Ctrl+Z brings the old note back until you close the app."
+const bigQuestion =
+  "Replace the current note with the contents of this file? The file is large, so this cannot be undone."
 
 describe("OpenPlainTextFileToReplaceNoteFeature", () => {
   let root: HTMLElement
@@ -165,5 +169,49 @@ describe("OpenPlainTextFileToReplaceNoteFeature", () => {
     expect(call).toHaveBeenCalledTimes(2)
     resolveDialog(null)
     await third
+  })
+
+  it("warns that a file above the undo limit cannot be undone", async () => {
+    const { feature, confirm } = setup(async () => "x".repeat(UNDOABLE_REPLACE_MAX + 1))
+
+    await feature.openFile()
+
+    expect(confirm).toHaveBeenCalledWith(bigQuestion, "Replace")
+  })
+
+  it("shows the message Rust gave, with Retry", async () => {
+    const { feature } = setup(async () => {
+      throw { kind: "invalid", message: "The file is larger than 10 MiB." }
+    })
+
+    await feature.openFile()
+
+    expect(banner().querySelector("p")?.textContent).toBe("The file is larger than 10 MiB.")
+    expect(retry()).toBeDefined()
+  })
+
+  it("shows the general message for a runtime error", async () => {
+    const { feature } = setup(async () => {
+      throw new Error("ipc")
+    })
+
+    await feature.openFile()
+
+    expect(banner().querySelector("p")?.textContent).toBe("The file could not be opened.")
+  })
+
+  it("hides a custom-message banner after a later successful open", async () => {
+    let fail = true
+    const { feature } = setup(async () => {
+      if (fail) throw { kind: "invalid", message: "The file is larger than 10 MiB." }
+      return "ok"
+    })
+
+    await feature.openFile()
+    expect(banner().hidden).toBe(false)
+
+    fail = false
+    await feature.openFile()
+    expect(banner().hidden).toBe(true)
   })
 })

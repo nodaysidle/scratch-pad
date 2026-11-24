@@ -17,12 +17,12 @@ done (unless a reviewer dispatched you and maintains this index).
 | 006 | Mode line and find in note | P2 | M | 005 | DONE (reviewed + driven in offscreen WebKit; branch `advisor/006-mode-line-and-find` at `8c2b018`, includes 005, merged) |
 | 007 | App icon and `--install-binary` (launcher entry named `scratch-pad`) | P2 | S | — | DONE (reviewed; merged) |
 | 008 | Export file name from the note and the date (words joined, `apikeys-14-11-2026.md`) | P2 | S | — | DONE (reviewed after two revision rounds; merged, `master` at `5781cf3`; installed) |
-| 009 | Keys go to the right layer (Esc, Enter on buttons, non-Latin layouts, find count) | P1 | S | — | TODO |
-| 010 | Backend: parented dialogs, distinct open errors, tests that check what they claim | P1 | M | — | TODO |
-| 011 | Opening a file can be undone with Ctrl+Z; a failed open says why | P1 | S | — | TODO |
-| 012 | Enter keeps the indent and continues a list | P2 | S | 011 (same file) | TODO |
-| 013 | Find starts from the selection, jumps as you type, says when it wraps | P2 | S-M | 009 | TODO |
-| 014 | A slow theme re-read never overwrites a newer pushed theme | P2 | S | — | TODO |
+| 009 | Keys go to the right layer (Esc, Enter on buttons, non-Latin layouts, find count) | P1 | S | — | DONE (reviewed; squash-merged to `master` as `7cc903f`; not yet checked in the real window) |
+| 010 | Backend: parented dialogs, distinct open errors, tests that check what they claim | P1 | M | — | DONE (reviewed; squash-merged to `master` as `acf723e`; not yet checked in the real window) |
+| 011 | Opening a file can be undone with Ctrl+Z; a failed open says why | P1 | S | — | DONE (reviewed; squash-merged to `master` as `f0d1da2`; not yet checked in the real window) |
+| 012 | Enter keeps the indent and continues a list | P2 | S | 011 (same file) | DONE (reviewed; squash-merged to `master` as `f0d1da2`; not yet checked in the real window) |
+| 013 | Find starts from the selection, jumps as you type, says when it wraps | P2 | S-M | 009 | DONE (reviewed; squash-merged to `master` as `7cc903f`; not yet checked in the real window) |
+| 014 | A slow theme re-read never overwrites a newer pushed theme | P2 | S | — | DONE (reviewed; squash-merged to `master` as `acf723e`; not yet checked in the real window) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale — finding fixed independently or approach abandoned)
 

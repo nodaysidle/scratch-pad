@@ -24,7 +24,7 @@ done (unless a reviewer dispatched you and maintains this index).
 | 013 | Find starts from the selection, jumps as you type, says when it wraps | P2 | S-M | 009 | DONE (reviewed; squash-merged to `master` as `7cc903f`; not yet checked in the real window) |
 | 014 | A slow theme re-read never overwrites a newer pushed theme | P2 | S | — | DONE (reviewed; squash-merged to `master` as `acf723e`; not yet checked in the real window) |
 | 015 | Autosave after 10 seconds; Ctrl+S saves the note now, export moves to Ctrl+Shift+S | P1 | S | — | DONE (reviewed; squash-merged to `master` as `a2fb1c4`; not pushed, not installed, not checked in the real window) |
-| 016 | A clearer bar (position as `Ln, Col`, Save button, one row when narrow) and a 100-character reading column | P1 | S-M | 015 | IN PROGRESS |
+| 016 | A quieter bar (save state and key hints only, Save button, no cursor position) and a 100-character reading column | P1 | S-M | 015 | DONE (reviewed; amended by the owner mid-run: no position, hints only; squash-merged as `ef903a8`) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale — finding fixed independently or approach abandoned)
 

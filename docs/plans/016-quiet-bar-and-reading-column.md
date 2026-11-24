@@ -12,6 +12,10 @@
 
 ## Status
 
+> **Amended 2026-11-24 during execution, on the owner's word:** no cursor position at all (the
+> position span, `positionOf` and its listeners were removed) and key hints only at every width
+> (`.toolbar .button-label` is always hidden). Steps 1 and 3 below describe the earlier design.
+
 - **Priority**: P1
 - **Effort**: S-M
 - **Risk**: LOW-MED (visual change that tests cannot see)

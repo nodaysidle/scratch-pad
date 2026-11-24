@@ -8,7 +8,7 @@
     <img src="https://img.shields.io/badge/Arch%20%2F%20Hyprland-Omarchy%20Native-1793D1?style=flat-square&logo=arch-linux&logoColor=white" alt="Arch / Hyprland / Omarchy">
     <img src="https://img.shields.io/badge/Tauri-2-24C8D8?style=flat-square&logo=tauri&logoColor=white" alt="Tauri 2">
     <img src="https://img.shields.io/badge/Storage-Local%20SQLite-232326?style=flat-square" alt="Local SQLite">
-    <img src="https://img.shields.io/badge/version-0.1.0-555555?style=flat-square" alt="Version 0.1.0">
+    <img src="https://img.shields.io/badge/version-0.2.0-555555?style=flat-square" alt="Version 0.2.0">
   </p>
 </div>
 

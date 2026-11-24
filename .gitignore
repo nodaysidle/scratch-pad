@@ -3,4 +3,4 @@ dist/
 dist-web/
 src-tauri/target/
 .optim-jev/
-graft/
+/graft/

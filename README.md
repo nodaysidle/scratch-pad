@@ -9,7 +9,7 @@
     <img src="https://img.shields.io/badge/Tauri-2-24C8D8?style=flat-square&logo=tauri&logoColor=white" alt="Tauri 2">
     <img src="https://img.shields.io/badge/Storage-Local%20SQLite-232326?style=flat-square" alt="Local SQLite">
     <img src="https://img.shields.io/badge/Network-none-232326?style=flat-square" alt="No network access">
-    <img src="https://img.shields.io/badge/version-0.2.0-555555?style=flat-square" alt="Version 0.2.0">
+    <img src="https://img.shields.io/badge/version-0.2.1-555555?style=flat-square" alt="Version 0.2.1">
   </p>
 
   <img src="docs/screenshots/tokyo-night.png" alt="Scratch Pad showing a note in the Tokyo Night theme" width="860">
@@ -67,14 +67,14 @@ The prebuilt binary needs Wayland, glibc 2.39 or newer (current Arch, Fedora 40+
 Then:
 
 ```bash
-curl -LO https://github.com/nodaysidle/scratch-pad/releases/download/v0.2.0/scratch-pad-0.2.0-linux-x86_64.tar.gz
-curl -LO https://github.com/nodaysidle/scratch-pad/releases/download/v0.2.0/scratch-pad-0.2.0-linux-x86_64.tar.gz.sha256
-sha256sum -c scratch-pad-0.2.0-linux-x86_64.tar.gz.sha256
-tar -xzf scratch-pad-0.2.0-linux-x86_64.tar.gz
-./scratch-pad-0.2.0/install.sh
+curl -LO https://github.com/nodaysidle/scratch-pad/releases/download/v0.2.1/scratch-pad-0.2.1-linux-x86_64.tar.gz
+curl -LO https://github.com/nodaysidle/scratch-pad/releases/download/v0.2.1/scratch-pad-0.2.1-linux-x86_64.tar.gz.sha256
+sha256sum -c scratch-pad-0.2.1-linux-x86_64.tar.gz.sha256
+tar -xzf scratch-pad-0.2.1-linux-x86_64.tar.gz
+./scratch-pad-0.2.1/install.sh
 ```
 
-This puts the binary in `~/.local/bin/scratch-pad` and adds the icon and a launcher entry, so it shows up in your app launcher (on Omarchy: `Super + Space`). Nothing needs root. `./scratch-pad-0.2.0/install.sh --uninstall` removes it again and keeps your note.
+This puts the binary in `~/.local/bin/scratch-pad` and adds the icon and a launcher entry, so it shows up in your app launcher (on Omarchy: `Super + Space`). Nothing needs root. `./scratch-pad-0.2.1/install.sh --uninstall` removes it again and keeps your note.
 
 It is developed and tested on Arch Linux with Hyprland (Omarchy). It should run on other Wayland desktops, where it falls back to the system's light or dark colours, but that is not tested.
 

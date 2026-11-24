@@ -9,7 +9,7 @@
     <img src="https://img.shields.io/badge/Tauri-2-24C8D8?style=flat-square&logo=tauri&logoColor=white" alt="Tauri 2">
     <img src="https://img.shields.io/badge/Storage-Local%20SQLite-232326?style=flat-square" alt="Local SQLite">
     <img src="https://img.shields.io/badge/Network-none-232326?style=flat-square" alt="No network access">
-    <img src="https://img.shields.io/badge/version-0.2.1-555555?style=flat-square" alt="Version 0.2.1">
+    <img src="https://img.shields.io/badge/version-0.2.2-555555?style=flat-square" alt="Version 0.2.2">
   </p>
 
   <img src="docs/screenshots/tokyo-night.png" alt="Scratch Pad showing a note in the Tokyo Night theme" width="860">
@@ -44,12 +44,12 @@ Only three colours are taken from the theme (`background`, `foreground`, `accent
 - **Stays out of the way.** No header, no decorations, no settings. The bar shows the save state and four keys: `^F` find, `^O` open, `^S` save, `^⇧S` export.
 - **Fits any tile.** The text starts at the left edge and fills the window, from a full-screen tile down to a small floating window (360x200).
 - **Edits like an editor.** Tab and Shift+Tab indent, Enter keeps the indent and continues `-`, `1.` and `- [ ]` lists, and undo survives all of it.
-- **Finds as you type.** `Ctrl+F` starts from the selected text and jumps to the first match while you type.
+- **Finds as you type.** `Ctrl+F` starts from the selected text and jumps to the first match while you type, highlighting it in the note.
 - **Opens and exports.** Load any UTF-8 text file (up to 10 MiB) into the note, and `Ctrl+Z` brings the old note back. Export as Markdown with a name taken from your first line and the date, such as `apikeys-14-11-2026.md`.
 - **Keeps to itself.** No network access, no account, no telemetry. The note lives in `~/.local/share/com.scratch.pad/records.sqlite3`. File dialogs run in Rust, so the web view never sees a path on your disk.
 
 <div align="center">
-  <img src="docs/screenshots/find.png" alt="The find bar open at the bottom of the window, showing 1 of 6 matches" width="860">
+  <img src="docs/screenshots/find.png" alt="The find bar open at the bottom of the window, with the match highlighted in the note" width="860">
 </div>
 
 ## Install
@@ -67,14 +67,14 @@ The prebuilt binary needs Wayland, glibc 2.39 or newer (current Arch, Fedora 40+
 Then:
 
 ```bash
-curl -LO https://github.com/nodaysidle/scratch-pad/releases/download/v0.2.1/scratch-pad-0.2.1-linux-x86_64.tar.gz
-curl -LO https://github.com/nodaysidle/scratch-pad/releases/download/v0.2.1/scratch-pad-0.2.1-linux-x86_64.tar.gz.sha256
-sha256sum -c scratch-pad-0.2.1-linux-x86_64.tar.gz.sha256
-tar -xzf scratch-pad-0.2.1-linux-x86_64.tar.gz
-./scratch-pad-0.2.1/install.sh
+curl -LO https://github.com/nodaysidle/scratch-pad/releases/download/v0.2.2/scratch-pad-0.2.2-linux-x86_64.tar.gz
+curl -LO https://github.com/nodaysidle/scratch-pad/releases/download/v0.2.2/scratch-pad-0.2.2-linux-x86_64.tar.gz.sha256
+sha256sum -c scratch-pad-0.2.2-linux-x86_64.tar.gz.sha256
+tar -xzf scratch-pad-0.2.2-linux-x86_64.tar.gz
+./scratch-pad-0.2.2/install.sh
 ```
 
-This puts the binary in `~/.local/bin/scratch-pad` and adds the icon and a launcher entry, so it shows up in your app launcher (on Omarchy: `Super + Space`). Nothing needs root. `./scratch-pad-0.2.1/install.sh --uninstall` removes it again and keeps your note.
+This puts the binary in `~/.local/bin/scratch-pad` and adds the icon and a launcher entry, so it shows up in your app launcher (on Omarchy: `Super + Space`). Nothing needs root. `./scratch-pad-0.2.2/install.sh --uninstall` removes it again and keeps your note.
 
 It is developed and tested on Arch Linux with Hyprland (Omarchy). It should run on other Wayland desktops, where it falls back to the system's light or dark colours, but that is not tested.
 

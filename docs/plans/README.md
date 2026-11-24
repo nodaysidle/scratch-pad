@@ -23,7 +23,7 @@ done (unless a reviewer dispatched you and maintains this index).
 | 012 | Enter keeps the indent and continues a list | P2 | S | 011 (same file) | DONE (reviewed; squash-merged to `master` as `f0d1da2`; not yet checked in the real window) |
 | 013 | Find starts from the selection, jumps as you type, says when it wraps | P2 | S-M | 009 | DONE (reviewed; squash-merged to `master` as `7cc903f`; not yet checked in the real window) |
 | 014 | A slow theme re-read never overwrites a newer pushed theme | P2 | S | — | DONE (reviewed; squash-merged to `master` as `acf723e`; not yet checked in the real window) |
-| 015 | Autosave after 10 seconds; Ctrl+S saves the note now, export moves to Ctrl+Shift+S | P1 | S | — | IN PROGRESS |
+| 015 | Autosave after 10 seconds; Ctrl+S saves the note now, export moves to Ctrl+Shift+S | P1 | S | — | DONE (reviewed; squash-merged to `master` as `a2fb1c4`; not pushed, not installed, not checked in the real window) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale — finding fixed independently or approach abandoned)
 

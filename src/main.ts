@@ -6,7 +6,7 @@ import { createErrorBanner } from "./errors"
 import { followOmarchy } from "./omarchy"
 import { bindShortcuts } from "./shortcuts"
 import { button, confirmDialog } from "./ui"
-import { createFindFeature } from "./features/findfeature"
+import { createFindFeature, type MatchRange } from "./features/findfeature"
 import { createModeLineFeature } from "./features/modelinefeature"
 import { createOpenPlainTextFileToReplaceNoteFeature } from "./features/openplaintextfiletoreplacenotefeature"
 import { createSaveNoteAsMarkdownFileFeature } from "./features/savenoteasmarkdownfilefeature"
@@ -68,8 +68,42 @@ const reveal = (index: number): void => {
   editor.textarea.scrollTop = Math.max(0, top - editor.textarea.clientHeight / 2)
 }
 
+// The previewed match is painted on a transparent copy of the note laid over the textarea, because
+// WebKitGTK does not draw a selection in an unfocused textarea. Same metrics, so it wraps like the note.
+let highlightBox: HTMLDivElement | null = null
+let highlightText: HTMLDivElement | null = null
+const syncHighlightScroll = (): void => {
+  if (highlightText) highlightText.style.transform = `translateY(-${editor.textarea.scrollTop}px)`
+}
+const highlight = (range: MatchRange | null): void => {
+  if (!range) {
+    highlightBox?.remove()
+    highlightBox = null
+    highlightText = null
+    editor.textarea.removeEventListener("scroll", syncHighlightScroll)
+    return
+  }
+  if (!highlightBox || !highlightText) {
+    highlightBox = document.createElement("div")
+    highlightBox.className = "editor-highlight"
+    highlightText = document.createElement("div")
+    highlightText.className = "editor editor-mirror editor-highlight-text"
+    highlightBox.append(highlightText)
+    editor.textarea.after(highlightBox)
+    editor.textarea.addEventListener("scroll", syncHighlightScroll)
+  }
+  const { value, clientWidth, clientHeight } = editor.textarea
+  highlightBox.style.width = `${clientWidth}px`
+  highlightBox.style.height = `${clientHeight}px`
+  highlightText.style.width = `${clientWidth}px`
+  const mark = document.createElement("mark")
+  mark.textContent = value.slice(range.start, range.end)
+  highlightText.replaceChildren(document.createTextNode(value.slice(0, range.start)), mark)
+  syncHighlightScroll()
+}
+
 const modeLine = createModeLineFeature({ store })
-const find = createFindFeature({ textarea: editor.textarea, reveal })
+const find = createFindFeature({ textarea: editor.textarea, reveal, highlight })
 // A replaced note (Ctrl+O) assigns textarea.value and fires no input event.
 store.subscribe(find.refresh)
 

@@ -73,6 +73,8 @@ export interface FindDeps {
   textarea: HTMLTextAreaElement
   /** Scrolls the note so the character at this position is visible. */
   reveal: (index: number) => void
+  /** Paints the previewed match while focus is in the find field, where the textarea's own selection is not drawn; null removes it. */
+  highlight?: (range: MatchRange | null) => void
 }
 
 export interface FindFeature {
@@ -127,6 +129,8 @@ export const createFindFeature = (deps: FindDeps): FindFeature => {
   let anchor = 0
 
   const step = (backwards: boolean): void => {
+    // The textarea takes focus here, so its own selection shows.
+    deps.highlight?.(null)
     const ranges = findMatchRanges(deps.textarea.value, input.value)
     if (ranges.length === 0) {
       count.textContent = describe(0)
@@ -149,6 +153,7 @@ export const createFindFeature = (deps: FindDeps): FindFeature => {
 
   const close = (): void => {
     element.hidden = true
+    deps.highlight?.(null)
     deps.textarea.focus()
   }
 
@@ -164,21 +169,27 @@ export const createFindFeature = (deps: FindDeps): FindFeature => {
     const ranges = findMatchRanges(deps.textarea.value, input.value)
     if (!input.value) {
       deps.textarea.setSelectionRange(anchor, anchor)
+      deps.highlight?.(null)
       count.textContent = ""
       return
     }
     const range = ranges[stepFrom(ranges.map(r => r.start), anchor, false)]
     if (!range) {
+      deps.highlight?.(null)
       count.textContent = describe(0)
       return
     }
     deps.textarea.setSelectionRange(range.start, range.end)
     deps.reveal(range.start)
+    deps.highlight?.(range)
     count.textContent = `${ranges.indexOf(range) + 1} of ${ranges.length}`
   })
 
   const onTextareaInput = (): void => {
-    if (!element.hidden) refreshCount()
+    if (element.hidden) return
+    // The text changed under the highlight, so its position is stale.
+    deps.highlight?.(null)
+    refreshCount()
   }
   deps.textarea.addEventListener("input", onTextareaInput)
 
@@ -215,6 +226,7 @@ export const createFindFeature = (deps: FindDeps): FindFeature => {
       if (!element.hidden && deps.textarea.value !== countedText) refreshCount()
     },
     destroy: () => {
+      deps.highlight?.(null)
       document.removeEventListener("keydown", onDocumentKeyDown)
       deps.textarea.removeEventListener("input", onTextareaInput)
     },

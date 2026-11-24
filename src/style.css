@@ -48,6 +48,10 @@ body { color: var(--fg); background: var(--bg); overflow: hidden; }
   position: absolute; top: 0; left: 0; visibility: hidden; flex: none; height: auto; min-height: 0;
   white-space: pre-wrap; overflow-wrap: break-word; pointer-events: none;
 }
+/* Paints the match previewed while find has focus; WebKitGTK does not draw a selection in an unfocused textarea. */
+.editor-highlight { position: absolute; top: 0; left: 0; overflow: hidden; pointer-events: none; }
+.editor-highlight .editor-highlight-text { visibility: visible; color: transparent; background: transparent; }
+.editor-highlight mark { color: var(--sel-fg); background: var(--sel-bg); }
 
 /* The mode line: save state, cursor, word count on the left; the actions as key hints on the right. */
 .status-bar {

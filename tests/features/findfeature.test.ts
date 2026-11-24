@@ -9,7 +9,8 @@ const setup = (text: string) => {
   textarea.value = text
   document.body.append(textarea)
   const reveal = vi.fn()
-  const feature = createFindFeature({ textarea, reveal })
+  const highlight = vi.fn()
+  const feature = createFindFeature({ textarea, reveal, highlight })
   document.body.append(feature.element)
   current = feature
   const input = feature.element.querySelector("input")!
@@ -18,7 +19,7 @@ const setup = (text: string) => {
     input.value = query
     input.dispatchEvent(new Event("input"))
   }
-  return { textarea, reveal, feature, input, count, type }
+  return { textarea, reveal, highlight, feature, input, count, type }
 }
 
 const press = (key: string, shiftKey = false): KeyboardEvent => {
@@ -349,5 +350,72 @@ describe("FindFeature", () => {
     expect(event.defaultPrevented).toBe(false)
     expect(press("Escape").defaultPrevented).toBe(false)
     expect(feature.element.hidden).toBe(false)
+  })
+
+  describe("highlight", () => {
+    it("paints the previewed match after revealing it", () => {
+      const { reveal, highlight, feature, type } = setup("one two one")
+      feature.open()
+      highlight.mockClear()
+      reveal.mockClear()
+      type("two")
+      expect(highlight).toHaveBeenLastCalledWith({ start: 4, end: 7 })
+      expect(reveal.mock.invocationCallOrder[0]).toBeLessThan(highlight.mock.invocationCallOrder[0]!)
+    })
+
+    it("removes it when the query is cleared or has no match", () => {
+      const { highlight, feature, type } = setup("one two one")
+      feature.open()
+      type("two")
+      type("")
+      expect(highlight).toHaveBeenLastCalledWith(null)
+      type("two")
+      type("zzz")
+      expect(highlight).toHaveBeenLastCalledWith(null)
+    })
+
+    it("removes it on Enter, on Escape and when the note's text changes", () => {
+      const { textarea, highlight, feature, type } = setup("one two one")
+      feature.open()
+      type("one")
+      highlight.mockClear()
+      press("Enter")
+      expect(highlight).toHaveBeenCalledWith(null)
+
+      type("two")
+      highlight.mockClear()
+      textarea.dispatchEvent(new Event("input"))
+      expect(highlight).toHaveBeenCalledWith(null)
+
+      type("two")
+      highlight.mockClear()
+      press("Escape")
+      expect(highlight).toHaveBeenCalledWith(null)
+    })
+
+    it("removes it on destroy", () => {
+      const { highlight, feature, type } = setup("one two one")
+      feature.open()
+      type("two")
+      highlight.mockClear()
+      feature.destroy()
+      expect(highlight).toHaveBeenCalledWith(null)
+    })
+
+    it("is optional", () => {
+      const textarea = document.createElement("textarea")
+      textarea.value = "one two one"
+      document.body.append(textarea)
+      const feature = createFindFeature({ textarea, reveal: vi.fn() })
+      document.body.append(feature.element)
+      current = feature
+      feature.open()
+      const input = feature.element.querySelector("input")!
+      input.value = "two"
+      input.dispatchEvent(new Event("input"))
+      press("Enter")
+      press("Escape")
+      expect([textarea.selectionStart, textarea.selectionEnd]).toEqual([4, 7])
+    })
   })
 })
